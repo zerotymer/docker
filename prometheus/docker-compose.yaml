@@ -1,0 +1,32 @@
+name: nginx
+services:
+  nginx:
+    image: nginx:stable-alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - 80:80
+    volumes:
+      - ./data:/usr/share/nginx/html:ro
+      - ./stub_status.conf:/etc/nginx/conf.d/stub_status.conf:ro
+    env_file:
+      - ".env"
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter
+    container_name: nginx-exporter
+    restart: unless-stopped
+    ports:
+      - 9113:9113
+    command: 
+      - "--nginx.scrape-uri=http://nginx:8080/nginx_status"
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
