@@ -1,0 +1,14 @@
+services: 
+  grafana:
+    image: grafana:grafana-enterprise
+    container_name: grafana
+    restart: unless-stopped
+    user: 1000:1000
+    enf_file:
+      - ".env"
+    posts:
+      - "3000:3000"
+    voluems:
+      - type: bind
+        source: data
+        target: /var/lib/grafana
