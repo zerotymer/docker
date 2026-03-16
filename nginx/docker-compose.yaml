@@ -1,0 +1,12 @@
+name: nginx
+services:
+  nginx:
+    image: nginx:stable-alpine
+    container_name: nginx
+    ports:
+      - 80:80
+    volumes:
+      - ./data:/usr/share/nginx/html:ro
+    env_file:
+      - ".env"
+
