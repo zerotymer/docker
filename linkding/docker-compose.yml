@@ -6,7 +6,7 @@ services:
       - 9090:9090
     volumes:
       - '.data:/etc/linkding/data'
-    environments:
+    environment:
       - LD_SUPERUSER_NAME=admin
       - LD_SUPERUSER_PASSWORD=password
       - LD_DISABLE_BACKGROUND_TASK=true
