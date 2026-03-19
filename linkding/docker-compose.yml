@@ -1,0 +1,13 @@
+services:
+  dokuwiki:
+    container_name: linkding
+    image: sissbruecker/linkding:latest-alpine
+    ports:
+      - 9090:9090
+    volumes:
+      - '.data:/etc/linkding/data'
+    environments:
+      - LD_SUPERUSER_NAME=admin
+      - LD_SUPERUSER_PASSWORD=password
+      - LD_DISABLE_BACKGROUND_TASK=true
+    restart: unless-stopped
