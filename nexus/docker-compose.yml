@@ -17,11 +17,19 @@ services:
   # Depenency Track - API server
   apiserver:
     image: dependencytrack/apiserver
-    container_name: dt-api
+    container_name: dtrack-api
     restart: unless-stopped
     user: '1200:1200'
     environment:
-      - ALPINE_DATABASE_MODE=internal
+      # - ALPINE_DATABASE_MODE=internal
+      - ALPINE_DATABASE_MODE=external
+      - ALPINE_DATABASE_URL=jdbc:postgresql://host.docker.internal:5432/dtrack
+      - ALPINE_DATABASE_DRIVER=org.postgresql.Driver
+      - ALPINE_DATABASE_USERNAME=dtrack
+      - ALPINE_DATABASE_PASSWORD=PASSWORD
+      - ALPINE_DATABASE_POOL_MAX_SIZE=20
+      - EXTRA_JAVA_OPTIONS=-Xmx4g
+
     ports:
       - "8082:8080"
     volumes:
@@ -32,7 +40,7 @@ services:
   # Depenency Track - Frontend
   frontend:
     image: dependencytrack/frontend:latest
-    container_name: dt-front
+    container_name: dtract-front
     restart: unless-stopped
     environment:
       - API_BASE_URL=http://192.168.28.10:8082
