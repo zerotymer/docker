@@ -1,29 +1,27 @@
 #!/usr/bin/env python3
-import json, os, urllib.request, urllib.parse, base64
+import json, os, urllib.request, urllib.parse, base64, tempfile
 
 # ── 설정 ──────────────────────────────────────
-NEXUS_URL   = "http://localhost:8081"
-NEXUS_USER  = "owasp"
-NEXUS_PASS  = PASSWORD
+NEXUS_URL  = "http://localhost:8081"
+NEXUS_USER = "USERNAME"
+NEXUS_PASS = "PASSWORD"
 
-DT_URL      = "http://localhost:8082"
-DT_API_KEY  = API_KEY
-DT_PROJECT  = "nexus-proxy"          # DT 내 프로젝트 이름 (자동 생성됨)
-DT_VERSION  = "snapshot"
+DT_URL     = "http://localhost:8082"
+DT_API_KEY = "PASSWORD"
+DT_VERSION = "snapshot"
 
-# 스캔할 Nexus 프록시 리포지토리 목록
-REPOS = [
-    "maven-central",   # maven
-    "npm-proxy",       # npm / pnpm
-    "pypi-proxy",      # pip
-    "go-proxy",
-]
-
-SBOM_FILE = "/tmp/nexus-sbom.cdx.json"
+# 리포지토리 → DT 프로젝트명 매핑
+# 값을 None 으로 두면 repo 이름을 그대로 사용
+REPOS = {
+    "maven-central": None,   # DT 프로젝트명: "maven-central"
+    "npm-proxy":     None,   # DT 프로젝트명: "npm-proxy"
+    "pypi-proxy":    None,   # DT 프로젝트명: "pypi-proxy"
+    "go-proxy":      None,   # DT 프로젝트명: "go-proxy"
+}
 # ──────────────────────────────────────────────
 
 
-def nexus_get(path):
+def nexus_get(path: str) -> dict:
     req = urllib.request.Request(f"{NEXUS_URL}{path}")
     creds = base64.b64encode(f"{NEXUS_USER}:{NEXUS_PASS}".encode()).decode()
     req.add_header("Authorization", f"Basic {creds}")
@@ -31,7 +29,7 @@ def nexus_get(path):
         return json.loads(r.read())
 
 
-def fetch_all(repo):
+def fetch_all(repo: str) -> list:
     items, token = [], None
     while True:
         path = f"/service/rest/v1/components?repository={repo}"
@@ -45,31 +43,82 @@ def fetch_all(repo):
     return items
 
 
-def to_purl(item):
+def to_purl(item: dict) -> str | None:
     fmt  = item.get("format", "")
     name = item.get("name", "")
     ver  = item.get("version") or "0"
     grp  = item.get("group", "")
-    if fmt == "maven2" and grp:
-        return f"pkg:maven/{grp}/{name}@{ver}"
-    elif fmt == "npm":
-        return f"pkg:npm/{name}@{ver}"
-    elif fmt == "pypi":
-        return f"pkg:pypi/{name}@{ver}"
-    elif fmt == "nuget":
-        return f"pkg:nuget/{name}@{ver}"
-    elif fmt == "rubygems":
-        return f"pkg:gem/{name}@{ver}"
-    elif fmt == "go":
-        return f"pkg:golang/{name}@{ver}"
-    return None
+    mapping = {
+        "maven2":   lambda: f"pkg:maven/{grp}/{name}@{ver}" if grp else None,
+        "npm":      lambda: f"pkg:npm/{name}@{ver}",
+        "pypi":     lambda: f"pkg:pypi/{name}@{ver}",
+        "nuget":    lambda: f"pkg:nuget/{name}@{ver}",
+        "rubygems": lambda: f"pkg:gem/{name}@{ver}",
+        "go":       lambda: f"pkg:golang/{name}@{ver}",
+    }
+    builder = mapping.get(fmt)
+    return builder() if builder else None
 
 
-# ── SBOM 생성 ─────────────────────────────────
-seen, components = set(), []
+def build_sbom(project_name: str, components: list) -> dict:
+    return {
+        "bomFormat":   "CycloneDX",
+        "specVersion": "1.5",
+        "version":     1,
+        "metadata": {
+            "component": {
+                "type":    "application",
+                "name":    project_name,
+                "version": DT_VERSION,
+            }
+        },
+        "components": components,
+    }
 
-for repo in REPOS:
-    print(f"[*] 조회 중: {repo}")
+
+def upload_to_dt(sbom_bytes: bytes, project_name: str) -> None:
+    boundary = "----DTrackBoundary"
+
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="autoCreate"\r\n\r\n'
+        f"true\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="projectName"\r\n\r\n'
+        f"{project_name}\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="projectVersion"\r\n\r\n'
+        f"{DT_VERSION}\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="bom"; filename="bom.json"\r\n'
+        f"Content-Type: application/json\r\n\r\n"
+    ).encode() + sbom_bytes + f"\r\n--{boundary}--\r\n".encode()
+
+    req = urllib.request.Request(
+        f"{DT_URL}/api/v1/bom",
+        data=body,
+        method="POST",
+    )
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+    req.add_header("X-Api-Key", DT_API_KEY)
+
+    try:
+        with urllib.request.urlopen(req) as r:
+            json.loads(r.read())
+            print(f"    [✓] 업로드 완료 → {DT_URL}/projects")
+    except urllib.error.HTTPError as e:
+        print(f"    [!] HTTP {e.code}: {e.read().decode()}")
+
+
+# ── 리포지토리별 처리 루프 ─────────────────────
+for repo, project_override in REPOS.items():
+    project_name = project_override or repo  # 매핑 없으면 repo 이름 사용
+
+    print(f"\n{'='*50}")
+    print(f"[*] 리포지토리: {repo}  →  DT 프로젝트: {project_name}")
+
+    # 1) Nexus에서 컴포넌트 수집
+    seen, components = set(), []
     for item in fetch_all(repo):
         purl = to_purl(item)
         if not purl or purl in seen:
@@ -83,65 +132,24 @@ for repo in REPOS:
             "bom-ref": purl,
         })
 
-sbom = {
-    "bomFormat":   "CycloneDX",
-    "specVersion": "1.5",
-    "version":     1,
-    "metadata": {
-        "component": {
-            "type":    "application",
-            "name":    DT_PROJECT,
-            "version": DT_VERSION,
-        }
-    },
-    "components": components,
-}
+    print(f"    컴포넌트 수: {len(components)}개")
 
-with open(SBOM_FILE, "w") as f:
-    json.dump(sbom, f, indent=2)
+    if not components:
+        print(f"    [!] 컴포넌트 없음, 스킵")
+        continue
 
-print(f"[*] SBOM 생성 완료: {len(components)}개 컴포넌트 → {SBOM_FILE}")
+    # 2) SBOM 생성 (메모리 내)
+    sbom      = build_sbom(project_name, components)
+    sbom_bytes = json.dumps(sbom, indent=2).encode()
 
+    # 필요 시 파일로도 저장
+    sbom_path = f"/tmp/nexus-sbom-{repo}.cdx.json"
+    with open(sbom_path, "wb") as f:
+        f.write(sbom_bytes)
+    print(f"    SBOM 저장: {sbom_path}")
 
-# ── Dependency-Track 업로드 ───────────────────
-# ── Dependency-Track 업로드 ───────────────────
-import email.mime.multipart, email.mime.base, email.generator, io
+    # 3) Dependency-Track 업로드
+    print(f"    [*] DT 업로드 중...")
+    upload_to_dt(sbom_bytes, project_name)
 
-print(f"[*] Dependency-Track 업로드 중...")
-
-# multipart/form-data 직접 구성 (외부 라이브러리 없이)
-boundary = "----DTrackBoundary"
-
-with open(SBOM_FILE, "rb") as f:
-    sbom_data = f.read()
-
-body = (
-    f"--{boundary}\r\n"
-    f'Content-Disposition: form-data; name="autoCreate"\r\n\r\n'
-    f"true\r\n"
-    f"--{boundary}\r\n"
-    f'Content-Disposition: form-data; name="projectName"\r\n\r\n'
-    f"{DT_PROJECT}\r\n"
-    f"--{boundary}\r\n"
-    f'Content-Disposition: form-data; name="projectVersion"\r\n\r\n'
-    f"{DT_VERSION}\r\n"
-    f"--{boundary}\r\n"
-    f'Content-Disposition: form-data; name="bom"; filename="bom.json"\r\n'
-    f"Content-Type: application/json\r\n\r\n"
-).encode() + sbom_data + f"\r\n--{boundary}--\r\n".encode()
-
-req = urllib.request.Request(
-    f"{DT_URL}/api/v1/bom",
-    data=body,
-    method="POST",
-)
-req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
-req.add_header("X-Api-Key", DT_API_KEY)
-
-try:
-    with urllib.request.urlopen(req) as r:
-        resp = json.loads(r.read())
-        print(f"[✓] 업로드 완료")
-        print(f"    결과 확인: {DT_URL}/projects")
-except urllib.error.HTTPError as e:
-    print(f"[!] HTTP {e.code}: {e.read().decode()}")
+print(f"\n[완료] 전체 처리 종료")
