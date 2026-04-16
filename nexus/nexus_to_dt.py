@@ -3,21 +3,21 @@ import json, os, urllib.request, urllib.parse, base64, tempfile
 
 # ── 설정 ──────────────────────────────────────
 NEXUS_URL  = "http://localhost:8081"
-NEXUS_USER = "USERNAME"
-NEXUS_PASS = "PASSWORD"
+NEXUS_USER = ""
+NEXUS_PASS = ""
 
 DT_URL     = "http://localhost:8082"
-DT_API_KEY = "PASSWORD"
+DT_API_KEY = ""
 DT_VERSION = "snapshot"
 
-# 리포지토리 → DT 프로젝트명 매핑
-# 값을 None 으로 두면 repo 이름을 그대로 사용
-REPOS = {
-    "maven-central": None,   # DT 프로젝트명: "maven-central"
-    "npm-proxy":     None,   # DT 프로젝트명: "npm-proxy"
-    "pypi-proxy":    None,   # DT 프로젝트명: "pypi-proxy"
-    "go-proxy":      None,   # DT 프로젝트명: "go-proxy"
-}
+REPOS = [
+    # parent, parent_uuid, repo, project_name
+    ("maven",   "", "maven-central",    "maven-central"),
+    ("npm",     "", "npm-proxy",        "npm-proxy"),
+    ("pypi",    "", "pypi-proxy",       "pypi-proxy"),
+    ("go",      "", "go-proxy",         "go-proxy"),
+    ]
+
 # ──────────────────────────────────────────────
 
 
@@ -76,7 +76,8 @@ def build_sbom(project_name: str, components: list) -> dict:
     }
 
 
-def upload_to_dt(sbom_bytes: bytes, project_name: str) -> None:
+#def upload_to_dt(sbom_bytes: bytes, project_name: str) -> None:
+def upload_to_dt(sbom_bytes: bytes, project_name: str, parent: str, parent_uuid: str) -> None:
     boundary = "----DTrackBoundary"
 
     body = (
@@ -89,6 +90,9 @@ def upload_to_dt(sbom_bytes: bytes, project_name: str) -> None:
         f"--{boundary}\r\n"
         f'Content-Disposition: form-data; name="projectVersion"\r\n\r\n'
         f"{DT_VERSION}\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="parentUUID"\r\n\r\n'
+        f"{parent_uuid}\r\n"
         f"--{boundary}\r\n"
         f'Content-Disposition: form-data; name="bom"; filename="bom.json"\r\n'
         f"Content-Type: application/json\r\n\r\n"
@@ -105,14 +109,14 @@ def upload_to_dt(sbom_bytes: bytes, project_name: str) -> None:
     try:
         with urllib.request.urlopen(req) as r:
             json.loads(r.read())
-            print(f"    [✓] 업로드 완료 → {DT_URL}/projects")
+            print(f"    [✓] 업로드 완료 → {parent}/{project_name} - {parent_uuid}")
     except urllib.error.HTTPError as e:
         print(f"    [!] HTTP {e.code}: {e.read().decode()}")
 
 
 # ── 리포지토리별 처리 루프 ─────────────────────
-for repo, project_override in REPOS.items():
-    project_name = project_override or repo  # 매핑 없으면 repo 이름 사용
+for (parent, parent_uuid, repo, project_name) in REPOS:
+
 
     print(f"\n{'='*50}")
     print(f"[*] 리포지토리: {repo}  →  DT 프로젝트: {project_name}")
@@ -150,6 +154,6 @@ for repo, project_override in REPOS.items():
 
     # 3) Dependency-Track 업로드
     print(f"    [*] DT 업로드 중...")
-    upload_to_dt(sbom_bytes, project_name)
+    upload_to_dt(sbom_bytes, project_name, parent, parent_uuid)
 
 print(f"\n[완료] 전체 처리 종료")
