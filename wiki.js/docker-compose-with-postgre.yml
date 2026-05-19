@@ -14,6 +14,7 @@ services:
     depends_on:
       - db
     environment:
+      DB_TYPE: postgres
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: wikijs
