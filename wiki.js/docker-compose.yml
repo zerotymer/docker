@@ -1,16 +1,7 @@
 services:
   wiki:
     image: ghcr.io/requarks/wiki:3
-    environment:
-      DB_TYPE: postgres
-      DB_HOST: localhost
-      DB_PORT: 5432
-      DB_USER: wikijs
-      DB_PASS: wikijsrocks
-      DB_NAME: wiki
     restart: unless-stopped
+    volumes:
+      - ./config.yml:/wiki/config.yml
     ports:
-      - "3000:3000"
-
-volumes:
-  db-data:

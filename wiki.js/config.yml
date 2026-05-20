@@ -1,9 +1,9 @@
 port: 3000
 db:
-  type: ${DB_TYPE}
-  host: ${DB_HOST}
-  port: ${DB_PORT}
-  user: ${DB_USER}
-  pass: ${DB_PASS}
-  db: ${DB_NAME}
+  type: postgres
+  host: 127.0.0.1
+  port: 5432
+  user: wikijs
+  pass: PASSWORD
+  db: wiki
 logLevel: info
