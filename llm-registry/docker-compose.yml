@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: llm-reg
+      POSTGRES_USER: user 
+      POSTGRES_PASSWORD: password        # 운영 환경에서는 반드시 변경
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llmref"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: zerotymer/llm-registry-api:latest
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user:password@postgres:5432/llm-reg
+      # JWT 서명 키는 기동 시 자동 생성, 초기 관리자는 admin/admin 고정 (환경변수 불필요)
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    image: zerotymer/llm-registry-front:latest
+    ports:
+      - "3000:3000"
+    environment:
+      BACKEND_API_URL: http://api:8000
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
