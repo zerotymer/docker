@@ -1,0 +1,27 @@
+# https://hub.docker.com/r/smallstep/step-ca
+
+name: step-ca
+
+services:
+  step-ca:
+    image: smallstep/step-ca:0.30.2
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./data:/home/step
+    env_file:
+      - .env.example
+      - path: .env
+        required: false
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
+networks:
+  step-ca-net:
+    driver: bridge
