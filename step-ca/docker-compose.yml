@@ -5,10 +5,13 @@ name: step-ca
 services:
   step-ca:
     image: smallstep/step-ca:0.30.2
+    container_name: step-ca
+    restart: unless-stopped
+    
     ports:
       - "9000:9000"
     volumes:
-      - ./data:/home/step
+      - step-ca-data:/home/step
     env_file:
       - .env.example
       - path: .env
@@ -21,7 +24,12 @@ services:
         reservations:
           cpus: "0.05"
           memory: 64M
+    networks:
+      - step-ca-net
 
 networks:
   step-ca-net:
     driver: bridge
+
+volumes:
+  step-ca-data:
