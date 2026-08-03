@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: ghcr.io/pgmq/pg18-pgmq:v1.10.0
+    container_name: postgres-pgmq
+    restart: unless-stopped
+
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    environment:
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgmq-data:/var/lib/postgresql
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+    shm_size: 256mb
+
+
+volumes:
+  pgmq-data:
