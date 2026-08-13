@@ -4,13 +4,12 @@ services:
     container_name: oracle-db
     restart: unless-stopped
     env_file:
-      - paht: .env
-        required: false
+      - .env
     ports:
       - "1521:1521"
     deploy:
       resources:
-        limit:
+        limits:
           cpus: "1.0"
           memory: 2G
 
