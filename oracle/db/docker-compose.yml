@@ -1,0 +1,16 @@
+services:
+  oracle:
+    image: gvenzl/oracle-xe:11
+    container_name: oracle-db
+    restart: unless-stopped
+    env_file:
+      - paht: .env
+        required: false
+    ports:
+      - "1521:1521"
+    deploy:
+      resources:
+        limit:
+          cpus: "1.0"
+          memory: 2G
+
