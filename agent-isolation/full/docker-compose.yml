@@ -1,0 +1,23 @@
+services:
+  agent:
+    container_name: agents
+    image: zerotymer/agent-isolation:latest-full
+    restart: unless-stopped
+    user: "1000:1000"
+    env_file:
+      - path: .env
+        required: false
+    networks:
+      - agent-net
+    volumes:
+      - .workspace:/workspace
+      - agent-vol:/home/agent/
+
+
+networks:
+  agent-net:
+    driver: bridge
+
+volumes:
+  agent-vol:
+    driver: local
