@@ -3,14 +3,16 @@ services:
     container_name: agents
     image: zerotymer/agent-isolation:latest-full
     restart: unless-stopped
-    user: "1000:1000"
     env_file:
       - path: .env
         required: false
     networks:
       - agent-net
+    ports:
+      - "50022:22"
     volumes:
       - .workspace:/workspace
+      - ~/.ssh/id_rsa.pub:/home/agent/.ssh/id_rsa.pub:ro
       - agent-vol:/home/agent/
 
 
