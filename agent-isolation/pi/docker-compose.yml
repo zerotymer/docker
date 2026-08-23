@@ -3,7 +3,6 @@ services:
     container_name: pi-agent
     image: zerotymer/agent-isolation:latest-pi
     restart: unless-stopped
-    user: "1000:1000"
     env_file:
       - path: .env
         required: false

@@ -3,7 +3,6 @@ services:
     container_name: claude-agent
     image: zerotymer/agent-isolation:latest-claude
     restart: unless-stopped
-    user: "1000:1000"
     env_file:
       - path: .env
         required: false

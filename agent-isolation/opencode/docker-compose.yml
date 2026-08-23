@@ -3,7 +3,6 @@ services:
     container_name: opencode-agent
     image: zerotymer/agent-isolation:latest-opencode
     restart: unless-stopped
-    user: "1000:1000"
     env_file:
       - path: .env
         required: false
