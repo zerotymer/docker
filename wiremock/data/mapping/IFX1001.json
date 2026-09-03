@@ -1,0 +1,8 @@
+{
+	"request": { "method": "GET", "url": "/api/IFX1001" },
+	"response": {
+		"status": 200,
+		"bodyFileName": "IFX1001.xml",
+		"headers": { "Content-Type": "application/xml; charset=UTF-8" }
+	}
+}
