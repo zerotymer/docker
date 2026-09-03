@@ -1,0 +1,8 @@
+{
+  "request": { "method": "GET", "url": "/api/order/1" },
+  "response": {
+    "status": 200,
+    "bodyFileName": "order.xml",
+    "headers": { "Content-Type": "application/xml; charset=UTF-8" }
+  }
+}
