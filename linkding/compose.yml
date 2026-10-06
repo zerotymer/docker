@@ -4,8 +4,14 @@ services:
     image: docker.io/sissbruecker/linkding:latest-alpine
     ports:
       - 9090:9090
+    volumes:
+      - linkding-vol:/etc/linkding/data
     env_file:
       - default.env
       - path: .env
-        requried: true
+        required: false
     restart: unless-stopped
+
+volumes:
+  linkding-vol:
+    driver: local
