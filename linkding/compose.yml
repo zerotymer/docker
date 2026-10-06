@@ -1,0 +1,11 @@
+services:
+  linkding:
+    container_name: linkding
+    image: docker.io/sissbruecker/linkding:latest-alpine
+    ports:
+      - 9090:9090
+    env_file:
+      - default.env
+      - path: .env
+        requried: true
+    restart: unless-stopped
