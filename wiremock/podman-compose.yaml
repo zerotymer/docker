@@ -1,0 +1,11 @@
+name: mock
+services:
+  wiremock:
+    image: docker.io/wiremock/wiremock:latest
+    container_name: wiremock
+    ports:
+      - 8080:8080
+    volumes:
+      - ./data:/home/wiremock
+    command: ["--global-response-templating"]
+
