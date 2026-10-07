@@ -1,0 +1,43 @@
+# FileName=openclaw
+[Unit]
+Description=OpenClaw Pod
+After=network-online.target
+Wants=network-online.target
+
+[Pod]
+PodName=openclaw
+PublishPort=18789
+
+[Install]
+WantedBy=multi-user.target
+---
+
+# FileName=openclaw-vol
+[Volume]
+VolumeName=openclaw-vol
+Label=app=openclaw
+
+---
+# FileName=openclaw-workspace
+[Volume]
+VolumeName=openclaw-workspace
+Label=app=openclaw
+
+---
+# FileName=openclaw-app
+[Unit]
+Description=OpenClaw App
+
+[Container]
+Pod=openclaw.pod
+ContainerName=openclaw-app
+Image=ghcr.io/openclaw/openclaw:latest
+Volume=openclaw-vol.volume:/home/node/.openclaw
+Volume=openclaw-workspace:/home/node/.openclaw/workspace
+AutoUpdate=registry
+Environment=NODE_ENV=production
+EnvironmentFile=.env
+
+[Service]
+Restart=on-failure
+RestartSec=5
