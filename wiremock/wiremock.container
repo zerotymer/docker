@@ -1,0 +1,8 @@
+[Container]
+ContainerName=wiremock
+Pod=wiremock.pod
+
+Image=docker.io/wiremock/wiremock:latest
+Volume=/srv/wiremock:/home/wiremock
+
+Exec=--global-response-templating
