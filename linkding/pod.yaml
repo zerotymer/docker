@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: linkding
+  labels: linkding
+
+spec:
+  restartPolicy: Always
+
+  containers:
+    - name: linkding
+      image: docker.io/sissbruecker/linkding:latest-alpine        
+      ports:
+        - containerPort: 9090
+        - hostPort: 9090
+      envFrom:
+        - configMap:
+            name: linkding-default
+        - secretRef:
+            name: linkding-secret
+            optional: true
+      volumeMounts:
+        - name: linkding-vol
+          mountPath: /etc/linkding/data
+
+  volumes:
+    - name: linkding-vol
+      persistentVolumeClaim: 
+      claimName: linkding-vol
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: linkding-vol
+
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: linkding-default
+data:
+  LD_SUPERUSER_NAME: "admin"
+  LD_SUPERUSER_PASSWORD: "password"
+  LD_DISABLE_BACKGROUND_TASK: "true"
+
+---
+# 최종 비밀값
+apiVersion: v1
+kind: Secret
+metadata:
+  name: linkding-secret
+type: Opaque
+data:
+  LD_SUPERUSER_NAME: "admin"
+  LD_SUPERUSER_PASSWORD: "password"
+

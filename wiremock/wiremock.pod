@@ -1,0 +1,6 @@
+[Pod]
+PodName=wiremock-pod
+PublishPort=8080
+
+[Install]
+WantedBy=multi-user.target
