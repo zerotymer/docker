@@ -6,10 +6,11 @@ Wants=network-online.target
 
 [Pod]
 PodName=openclaw
-PublishPort=18789
+PublishPort=127.0.0.1:18789:18789
+PodmanArgs=--shm-size=2g
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 ---
 
 # FileName=openclaw-vol
@@ -32,11 +33,22 @@ Description=OpenClaw App
 Pod=openclaw.pod
 ContainerName=openclaw-app
 Image=ghcr.io/openclaw/openclaw:latest
+Exec=node openclaw.mjs gateway --bind lan --port 18789
 Volume=openclaw-vol.volume:/home/node/.openclaw
-Volume=openclaw-workspace:/home/node/.openclaw/workspace
-AutoUpdate=registry
+Volume=openclaw-workspace.volume:/home/node/.openclaw/workspace
 Environment=NODE_ENV=production
 EnvironmentFile=.env
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+podmanArgs=--cpus=2 --memory=4g
+AutoUpdate=registry
+
+HealthCmd=node dist/docker-healthchk.js
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=5
+HealthStartPerod=20s
+HealthOnFailure=kill
 
 [Service]
 Restart=on-failure
