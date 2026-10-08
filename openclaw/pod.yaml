@@ -10,9 +10,11 @@ spec:
   containers:
     - name: openclaw
       image: ghcr.io/openclaw/openclaw:latest
+      args: ["node", "openclaw.mjs", "gateway", "--bind", "lan", "--port", "18789"]
       ports: 
         - containerPort: 18789
           hostPort: 18789
+          hostIP: 127.0.0.1
       volumeMounts:
         - name: openclaw-vol
           mountPath: /home/node/.openclaw
@@ -26,7 +28,7 @@ spec:
           value: production
       resources:
         limits: 
-          cpu: "1"
+          cpu: "2"
           memory: "4Gi"
       startupProbe:
         httpGet: 
@@ -72,7 +74,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   resources:
-    request:
+    requests:
       storage: 1Gi
 
 ---
@@ -82,6 +84,7 @@ metadata:
   name: openclaw-secret
   namespace: openclaw
 type: Opaque
-stringdata:
+stringData:
+  # 실행 전 openssl rand -hex 32 값으로 교체
   OPENCLAW_GATEWAY_TOKEN: "token"
 

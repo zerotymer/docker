@@ -37,17 +37,18 @@ Exec=node openclaw.mjs gateway --bind lan --port 18789
 Volume=openclaw-vol.volume:/home/node/.openclaw
 Volume=openclaw-workspace.volume:/home/node/.openclaw/workspace
 Environment=NODE_ENV=production
-EnvironmentFile=.env
+# openssl rand -hex 32 | tr -d '\n' | podman secret create openclaw-gateway-token -
+Secret=openclaw-gateway-token,type=env,target=OPENCLAW_GATEWAY_TOKEN
 NoNewPrivileges=true
 DropCapability=NET_RAW NET_ADMIN
-podmanArgs=--cpus=2 --memory=4g
+PodmanArgs=--cpus=2 --memory=4g
 AutoUpdate=registry
 
-HealthCmd=node dist/docker-healthchk.js
+HealthCmd=node dist/docker-healthcheck.js
 HealthInterval=30s
 HealthTimeout=5s
 HealthRetries=5
-HealthStartPerod=20s
+HealthStartPeriod=20s
 HealthOnFailure=kill
 
 [Service]
