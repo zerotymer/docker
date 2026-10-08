@@ -3,7 +3,8 @@ kind: Pod
 metadata:
   name: openclaw
   namespace: openclaw
-  labels: openclaw
+  labels:
+    app: openclaw
 spec:
   restartPolicy: Always
   containers:
@@ -19,7 +20,7 @@ spec:
           mountPath: /home/node/.openclaw/workspace
       envFrom:
         - secretRef:
-          name: openclaw-secret
+            name: openclaw-secret
       env:
         - name: NODE_ENV
           value: production
@@ -29,20 +30,16 @@ spec:
           memory: "4Gi"
       startupProbe:
         httpGet: 
-          path: /healthz
+          path: /startupz
           port: 18789
-          periodSecods: 15
-
-    - name: openclaw-cli
-      image: ghcr.io/openclaw/openclaw:lastest
-      volumeMounts:
-        - name: openclaw-vol
-          mountPath: /home/node/.openclaw
-        - name: openclaw-workspace
-          mountPath: /home/node/.openclaw/workspace
-      command:
-        - "openclaw"
-
+        periodSeconds: 5
+        failureThreshold: 12
+      livenessProbe:
+        exec:
+          command: ["node", "dist/docker-healthcheck.js"]
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 5
 
   volumes:
     - name: openclaw-vol
@@ -67,7 +64,7 @@ spec:
 
 ---
 apiVersion: v1
-kind: persistentVolumeClaim
+kind: PersistentVolumeClaim
 metadata:
   name: openclaw-workspace
   namespace: openclaw
@@ -85,6 +82,6 @@ metadata:
   name: openclaw-secret
   namespace: openclaw
 type: Opaque
-data:
+stringdata:
   OPENCLAW_GATEWAY_TOKEN: "token"
 
