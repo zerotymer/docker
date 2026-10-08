@@ -3,7 +3,7 @@ services:
     container_name: linkding
     image: docker.io/sissbruecker/linkding:latest-alpine
     ports:
-      - 9090:9090
+      - 127.0.0.1:9090:9090
     volumes:
       - linkding-vol:/etc/linkding/data
     env_file:

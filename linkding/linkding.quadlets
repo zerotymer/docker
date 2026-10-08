@@ -1,0 +1,46 @@
+# FileName=linkding
+[Unit]
+Description=linkding Pod
+After=network-online.target
+Wants=network-online.target
+
+[Pod]
+PodName=linkding
+ServiceName=linkding
+PublishPort=127.0.0.1:9090:9090
+
+[Install]
+WantedBy=default.target
+---
+
+# FileName=linkding-vol
+[Volume]
+VolumeName=linkding-vol
+Label=app=linkding
+
+---
+# FileName=linkding-app
+[Unit]
+Description=linkding App
+
+[Container]
+Pod=linkding.pod
+ContainerName=linkding-container
+Image=docker.io/sissbruecker/linkding:latest-alpine
+Volume=linkding-vol.volume:/etc/linkding/data
+Environment=LD_SUPERUSER_NAME=admin
+# printf '%s' 'password' | podman secret create linkding-superuser-password -
+Secret=linkding-superuser-password,type=env,target=LD_SUPERUSER_PASSWORD
+NoNewPrivileges=true
+AutoUpdate=registry
+
+HealthCmd=curl -f http://localhost:9090/health
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=20s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5

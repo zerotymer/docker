@@ -2,38 +2,47 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: linkding
-  labels: linkding
+  namespace: linkding
+  labels:
+    app: linkding
 
 spec:
   restartPolicy: Always
 
   containers:
     - name: linkding
-      image: docker.io/sissbruecker/linkding:latest-alpine        
+      image: docker.io/sissbruecker/linkding:latest-alpine
       ports:
         - containerPort: 9090
-        - hostPort: 9090
+          hostPort: 9090
+          hostIP: 127.0.0.1
       envFrom:
         - configMap:
             name: linkding-default
         - secretRef:
             name: linkding-secret
-            optional: true
       volumeMounts:
         - name: linkding-vol
           mountPath: /etc/linkding/data
+      livenessProbe:
+        exec:
+          command: ["curl", "-f", "http://localhost:9090/health"]
+        initialDelaySeconds: 20
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
 
   volumes:
     - name: linkding-vol
-      persistentVolumeClaim: 
-      claimName: linkding-vol
+      persistentVolumeClaim:
+        claimName: linkding-vol
 
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: linkding-vol
-
+  namespace: linkding
 spec:
   accessModes:
     - ReadWriteOnce
@@ -46,10 +55,9 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: linkding-default
+  namespace: linkding
 data:
   LD_SUPERUSER_NAME: "admin"
-  LD_SUPERUSER_PASSWORD: "password"
-  LD_DISABLE_BACKGROUND_TASK: "true"
 
 ---
 # 최종 비밀값
@@ -57,8 +65,8 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: linkding-secret
+  namespace: linkding
 type: Opaque
 data:
-  LD_SUPERUSER_NAME: "admin"
-  LD_SUPERUSER_PASSWORD: "password"
-
+  LD_SUPERUSER_NAME: "YWRtaW4=" # admin
+  LD_SUPERUSER_PASSWORD: "cGFzc3dvcmQ=" # password

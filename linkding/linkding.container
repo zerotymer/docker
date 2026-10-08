@@ -1,9 +1,0 @@
-[Container]
-ContainerName=linkding
-Pod=linkding.pod
-
-Image=docker.io/sissbruecker/linkding:latest-alpine
-Volume=linkding.volume:/etc/linkding/data
-
-EnvironmentFile=default.env
-EnvironmentFile=.env
