@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: adguard-home
+  namespace: adguard-home
+  labels:
+    app: adguard-home
+spec:
+  restartPolicy: Always
+  containers:
+    - name: adguard-home
+      image: docker.io/adguard/adguardhome:latest
+      ports:
+        # DNS
+        - containerPort: 53
+          hostPort: 53
+          protocol: TCP
+        - containerPort: 53
+          hostPort: 53
+          protocol: UDP
+        # 웹 UI, DNS-over-HTTPS
+        - containerPort: 80
+          hostPort: 80
+          protocol: TCP
+        - containerPort: 443
+          hostPort: 443
+          protocol: TCP
+        - containerPort: 443
+          hostPort: 443
+          protocol: UDP
+        # 최초 설정 마법사
+        - containerPort: 3000
+          hostIP: 127.0.0.1
+          hostPort: 3000
+          protocol: TCP
+        # DNS-over-TLS, DNS-over-QUIC
+        - containerPort: 853
+          hostPort: 853
+          protocol: TCP
+        - containerPort: 853
+          hostPort: 853
+          protocol: UDP
+        # DNSCrypt
+        - containerPort: 5443
+          hostPort: 5443
+          protocol: TCP
+        - containerPort: 5443
+          hostPort: 5443
+          protocol: UDP
+      env:
+        - name: TZ
+          value: Asia/Seoul
+      volumeMounts:
+        - name: adguard-home-work
+          mountPath: /opt/adguardhome/work
+        - name: adguard-home-conf
+          mountPath: /opt/adguardhome/conf
+      securityContext:
+        allowPrivilegeEscalation: false
+
+  volumes:
+    - name: adguard-home-work
+      persistentVolumeClaim:
+        claimName: adguard-home-work
+    - name: adguard-home-conf
+      persistentVolumeClaim:
+        claimName: adguard-home-conf
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: adguard-home-work
+  namespace: adguard-home
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: adguard-home-conf
+  namespace: adguard-home
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
