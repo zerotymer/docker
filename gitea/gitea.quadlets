@@ -1,0 +1,47 @@
+# FileName=gitea
+[Unit]
+Description=Gitea Pod
+After=network-online.target
+Wants=network-online.target
+
+[Pod]
+PodName=gitea
+ServiceName=gitea
+PublishPort=3000:3000
+PublishPort=2222:22
+
+[Install]
+WantedBy=default.target
+---
+
+# FileName=gitea-vol
+[Volume]
+VolumeName=gitea-vol
+Label=app=gitea
+
+---
+# FileName=gitea-app
+[Unit]
+Description=Gitea App
+
+[Container]
+Pod=gitea.pod
+ContainerName=gitea-app
+Image=docker.gitea.com/gitea:1.26.1
+Volume=gitea-vol.volume:/data
+Environment=TZ=Asia/Seoul
+Environment=USER_UID=1000
+Environment=USER_GID=1000
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+
+HealthCmd=curl -fsS http://localhost:3000/api/healthz
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=30s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
