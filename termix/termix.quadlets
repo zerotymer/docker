@@ -1,0 +1,68 @@
+# FileName=termix
+[Unit]
+Description=Termix Pod
+After=network-online.target
+Wants=network-online.target
+
+[Pod]
+PodName=termix
+ServiceName=termix
+PublishPort=127.0.0.1:8080:8080
+
+[Install]
+WantedBy=default.target
+---
+
+# FileName=termix-vol
+[Volume]
+VolumeName=termix-vol
+Label=app=termix
+
+---
+# FileName=termix-guacd
+[Unit]
+Description=Termix guacd
+
+[Container]
+Pod=termix.pod
+ContainerName=termix-guacd
+Image=docker.io/guacamole/guacd:1.6.0
+Volume=termix-vol.volume:/termix-data
+NoNewPrivileges=true
+AutoUpdate=registry
+
+[Service]
+Restart=on-failure
+RestartSec=5
+
+---
+# FileName=termix-app
+[Unit]
+Description=Termix App
+Requires=termix-guacd.service
+After=termix-guacd.service
+
+[Container]
+Pod=termix.pod
+ContainerName=termix-app
+Image=ghcr.io/lukegus/termix:latest
+Volume=termix-vol.volume:/app/data
+Environment=PORT=8080
+# Pod 안의 컨테이너는 localhost로 서로 통신한다
+Environment=GUACD_HOST=127.0.0.1
+Environment=GUACD_TUNNEL_HOST=127.0.0.1
+Environment=GUACD_RECORDING_PATH=/termix-data/session_recordings/guacamole
+Environment=GUACD_DRIVE_PATH=/termix-data/rdp-drive
+NoNewPrivileges=true
+AutoUpdate=registry
+
+HealthCmd=wget -q -O /dev/null http://localhost:30001/health
+HealthInterval=30s
+HealthTimeout=10s
+HealthRetries=3
+HealthStartPeriod=60s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
