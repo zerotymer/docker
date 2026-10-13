@@ -1,0 +1,54 @@
+# FileName=postgresql
+[Unit]
+Description=PostgreSQL Pod
+After=network-online.target
+Wants=network-online.target
+
+[Pod]
+PodName=postgresql
+ServiceName=postgresql
+PublishPort=127.0.0.1:5432:5432
+PodmanArgs=--shm-size=256m
+
+[Install]
+WantedBy=default.target
+---
+
+# FileName=postgresql-vol
+[Volume]
+VolumeName=postgresql-vol
+Label=app=postgresql
+
+---
+# FileName=postgresql-app
+[Unit]
+Description=PostgreSQL App
+
+[Container]
+Pod=postgresql.pod
+ContainerName=postgresql-app
+Image=ghcr.io/pgmq/pg18-pgmq:v1.10.0
+# postgres(uid 999)가 /var/lib/postgresql/18을 만들 수 있도록 소유권과 SELinux 레이블을 맞춘다
+Volume=postgresql-vol.volume:/var/lib/postgresql:U,Z
+# 유닉스 소켓 공유. rootless는 /run/user/<UID>/postgresql, rootful은 /run/postgresql
+Volume=%t/postgresql:/var/run/postgresql:U,z
+Environment=POSTGRES_DB=pgmq_lab
+Environment=POSTGRES_USER=postgres
+Environment=TZ=Asia/Seoul
+Environment=PGTZ=Asia/Seoul
+# openssl rand -hex 32 | tr -d '\n' | podman secret create postgresql-password -
+Secret=postgresql-password,type=env,target=POSTGRES_PASSWORD
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+
+# systemd가 $를 확장하므로 Environment 값과 맞춰 직접 적는다
+HealthCmd=pg_isready -U postgres -d pgmq_lab
+HealthInterval=10s
+HealthTimeout=3s
+HealthRetries=5
+HealthStartPeriod=10s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5

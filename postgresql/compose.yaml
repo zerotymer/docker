@@ -3,7 +3,11 @@ services:
     image: ghcr.io/pgmq/pg18-pgmq:v1.10.0
     container_name: postgres-pgmq
     restart: unless-stopped
-
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgmq-data:/var/lib/postgresql
+      - ./init:/docker-entrypoint-initdb.d:ro
     env_file:
       - default.env
       - path: .env
@@ -11,11 +15,9 @@ services:
     environment:
       TZ: Asia/Seoul
       PGTZ: Asia/Seoul
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgmq-data:/var/lib/postgresql
-      - ./init:/docker-entrypoint-initdb.d:ro
+    security_opt:
+      - no-new-privileges:true
+    shm_size: 256mb
     healthcheck:
       test:
         - "CMD-SHELL"
@@ -25,8 +27,6 @@ services:
       retries: 10
       start_period: 10s
 
-    shm_size: 256mb
-
-
 volumes:
   pgmq-data:
+    driver: local
