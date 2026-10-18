@@ -1,0 +1,148 @@
+# =============================================================================
+# Oracle Database - 개발/테스트 서버용 Docker Compose (Free / XE 전용)
+# -----------------------------------------------------------------------------
+# 서비스 구성:
+#   oracle       : 26ai Free  (기본, 항상 기동)   포트 1521  ★ 권장
+#   oracle-xe21  : 21c XE     (profile: xe21)     포트 1522  ⚠ Legacy
+#   oracle-xe11  : 11gR2 XE   (profile: xe11)     포트 1523  ⚠ Legacy / EOL / 커뮤니티 이미지
+#
+# 이미지 출처:
+#   26ai Free : container-registry.oracle.com/database/free     (Oracle 공식)
+#   21c  XE   : container-registry.oracle.com/database/express  (Oracle 공식)
+#   11g  XE   : docker.io/gvenzl/oracle-xe                      (커뮤니티, OCR 미제공)
+#
+# 환경변수 로딩 (뒤 파일이 앞 값을 덮어씀): default.env → .env(선택)
+#   oracle-xe11 은 마지막에 xe11.map.env 로 변수명만 변환 (ORACLE_PWD → ORACLE_PASSWORD)
+#   * env_file 의 path/required 문법은 Docker Compose v2.24.0 이상 필요
+#
+# 실행:
+#   docker compose up -d                          # 26ai Free 만
+#   docker compose --profile xe21 up -d           # + 21c XE
+#   docker compose --profile xe11 up -d           # + 11g XE
+#   docker compose --profile xe21 --profile xe11 up -d   # 전체
+#
+# 공통: 로그인 불필요, XE 는 패치 미제공(Free 는 분기별 신규 이미지로 갱신)
+# =============================================================================
+
+name: oracle-dev
+
+x-common: &common
+  restart: unless-stopped
+  stop_grace_period: 2m              # SHUTDOWN IMMEDIATE 완료 대기 (기본 10s는 짧음)
+  env_file:
+    - path: ./default.env
+      required: true
+    - path: ./.env
+      required: false
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Oracle AI Database 26ai Free (23.26.x)  ★ 기본 개발 DB
+  #   - Long Term Release, SID=FREE / PDB=FREEPDB1 고정
+  #   - 사전 생성 DB 포함 → 기동 빠름 / EM Express 미지원
+  #   접속  CDB : sqlplus sys/<pwd>@//<host>:1521/FREE as sysdba
+  #         PDB : sqlplus system/<pwd>@//<host>:1521/FREEPDB1
+  # ---------------------------------------------------------------------------
+  oracle:
+    <<: *common
+    # 재현성을 위해 latest 대신 버전 태그 고정 권장 (예: 23.26.x.0), ARM64 는 -arm64 태그
+    image: container-registry.oracle.com/database/free:latest
+    container_name: oracle-dev
+    hostname: oracle-dev
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+      - ./scripts/setup:/opt/oracle/scripts/setup:ro          # 최초 DB 생성 후 1회 실행
+      - ./scripts/startup:/opt/oracle/scripts/startup:ro      # 매 기동 시 실행
+    healthcheck:
+      test: ["CMD", "/opt/oracle/checkDBStatus.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 2m
+
+  # ---------------------------------------------------------------------------
+  # Oracle Database 21c Express Edition  ⚠ Legacy
+  #   - Innovation Release: Premier 2027-07-31 종료, Extended 없음 → 26ai Free 로 대체됨
+  #   - 용도: 12c~19c 시절 애플리케이션 / 구버전 클라이언트 호환 테스트
+  #   - SID=XE / PDB=XEPDB1 고정, x86_64 전용, 최초 기동 시 DB 생성(수 분)
+  #   - XE 제한: CPU 2스레드, 메모리 2GB, 사용자 데이터 12GB
+  #   접속  CDB : sqlplus sys/<pwd>@//<host>:1522/XE as sysdba
+  #         PDB : sqlplus system/<pwd>@//<host>:1522/XEPDB1
+  # ---------------------------------------------------------------------------
+  oracle-xe21:
+    <<: *common
+    profiles: [xe21]
+    image: container-registry.oracle.com/database/express:21.3.0-xe
+    platform: linux/amd64
+    container_name: oracle-xe21
+    hostname: oracle-xe21
+    ports:
+      - "1522:1521"
+      # - "5500:5500"                  # EM Express (https://<host>:5500/em/) 필요 시
+    volumes:
+      - oracle-xe21-data:/opt/oracle/oradata
+      - ./scripts/setup:/opt/oracle/scripts/setup:ro          # 26ai 와 공용 (12c+ 구조 동일)
+      - ./scripts/startup:/opt/oracle/scripts/startup:ro
+    healthcheck:
+      test: ["CMD", "/opt/oracle/checkDBStatus.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 10m
+
+  # ---------------------------------------------------------------------------
+  # Oracle Database 11g Release 2 Express Edition (11.2.0.2)  ⚠ Legacy / EOL
+  #   - 이미지: gvenzl/oracle-xe (Gerald Venzl, Testcontainers Oracle XE 기본 이미지)
+  #     · Oracle 공식 아님. 2024-10-01 이후 갱신 없음(동결) → 사실상 유지보수 종료
+  #     · 원본 11.2.0.2 XE RPM 기반, 패치 미적용 / x86_64 전용
+  #   - 11g 지원 종료(Extended 2020-12) → 외부 비노출, 격리된 테스트 한정
+  #     · 운영 11g(대개 11.2.0.4 EE)와 버전·에디션이 달라 완전한 재현은 아님
+  #     · 비멀티테넌트(CDB/PDB 없음), SID=XE 고정, 문자셋 AL32UTF8 고정
+  #   - 환경변수 체계가 Oracle 공식 이미지와 다름 (ORACLE_PASSWORD 등)
+  #     → xe11.map.env 에서 default.env/.env 의 ORACLE_PWD 를 자동 변환
+  #   - 태그 변형: 11(기본) / 11-slim(Text·Spatial 등 제거) / 11-full(전체) / *-faststart
+  #   접속  : sqlplus system/<pwd>@//<host>:1523/XE
+  # ---------------------------------------------------------------------------
+  oracle-xe11:
+    <<: *common
+    profiles: [xe11]
+    # 동결 이미지라 태그 변경 가능성은 낮지만, 공급망 고정이 필요하면 digest 로 고정:
+    #   docker inspect --format '{{index .RepoDigests 0}}' gvenzl/oracle-xe:11.2.0.2
+    image: docker.io/gvenzl/oracle-xe:11.2.0.2
+    platform: linux/amd64
+    container_name: oracle-xe11
+    hostname: oracle-xe11
+    shm_size: 1g                       # 11g XE 는 MEMORY_TARGET 이 /dev/shm 사용
+    env_file:
+      - path: ./default.env
+        required: true
+      - path: ./.env
+        required: false
+      - path: ./xe11.map.env           # 반드시 마지막 (위 두 파일 값을 참조해 변환)
+        required: true
+    ports:
+      - "1523:1521"
+    volumes:
+      - oracle-xe11-data:/u01/app/oracle/oradata
+      - ./scripts/xe11/setup:/container-entrypoint-initdb.d:ro       # 최초 DB 생성 후 1회
+      - ./scripts/xe11/startup:/container-entrypoint-startdb.d:ro    # 매 기동 시
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 5m
+
+# Named volume 사용: 컨테이너 내부 oracle 사용자 권한 문제 회피
+volumes:
+  oracle-data:
+  oracle-xe21-data:
+  oracle-xe11-data:
