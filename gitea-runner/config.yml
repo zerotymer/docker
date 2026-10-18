@@ -1,0 +1,2 @@
+# 비어 있으면 모든 항목이 기본값이다.
+# 전체 옵션: docker compose run --rm --entrypoint act_runner runner generate-config
