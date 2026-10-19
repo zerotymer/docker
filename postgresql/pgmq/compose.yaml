@@ -1,9 +1,14 @@
 services:
-  postgres:
+  pgmq:
     image: ghcr.io/pgmq/pg18-pgmq:v1.10.0
-    container_name: postgres-pgmq
+    container_name: pgmq
     restart: unless-stopped
-
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # PostgreSQL 18 이미지는 /var/lib/postgresql/18/docker에 데이터를 만든다
+      - pgmq-data:/var/lib/postgresql
+      - ./init:/docker-entrypoint-initdb.d:ro,Z
     env_file:
       - default.env
       - path: .env
@@ -11,11 +16,12 @@ services:
     environment:
       TZ: Asia/Seoul
       PGTZ: Asia/Seoul
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgmq-data:/var/lib/postgresql
-      - ./init:/docker-entrypoint-initdb.d:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    shm_size: 256mb
     healthcheck:
       test:
         - "CMD-SHELL"
@@ -24,9 +30,6 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
-
-    shm_size: 256mb
-
 
 volumes:
   pgmq-data:
