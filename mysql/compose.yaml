@@ -1,0 +1,55 @@
+# 주 버전마다 프로필이 있다. 모두 127.0.0.1:3306을 쓰므로 하나만 골라 띄운다.
+# 권장: 컨테이너 하나, LTS 9.7
+#   docker compose --profile 9.7 up -d
+x-mysql: &mysql
+  restart: unless-stopped
+  ports:
+    - "127.0.0.1:3306:3306"
+  env_file:
+    - default.env
+    - path: .env
+      required: false
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - NET_RAW
+    - NET_ADMIN
+  healthcheck:
+    # TCP로 확인한다. 초기화 중 임시 서버는 소켓만 열어 두므로 소켓 ping은 너무 일찍 성공한다
+    test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+    interval: 10s
+    timeout: 5s
+    retries: 12
+    start_period: 60s
+
+services:
+  mysql-9.7:
+    <<: *mysql
+    image: docker.io/library/mysql:9.7
+    container_name: mysql-9.7
+    profiles: ["9.7"]
+    volumes:
+      # 엔트리포인트가 root로 시작해 /var/lib/mysql을 mysql(999)로 chown한다
+      # 이름 있는 볼륨은 엔진이 SELinux 레이블을 관리한다. 바인드 마운트로 바꾸면 :Z를 붙인다
+      - mysql-9.7-data:/var/lib/mysql
+
+  mysql-8.4:
+    <<: *mysql
+    image: docker.io/library/mysql:8.4
+    container_name: mysql-8.4
+    profiles: ["8.4"]
+    volumes:
+      - mysql-8.4-data:/var/lib/mysql
+
+  mysql-26:
+    <<: *mysql
+    image: docker.io/library/mysql:26
+    container_name: mysql-26
+    profiles: ["26"]
+    volumes:
+      - mysql-26-data:/var/lib/mysql
+
+volumes:
+  mysql-9.7-data:
+  mysql-8.4-data:
+  mysql-26-data:
