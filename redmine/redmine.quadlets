@@ -1,0 +1,42 @@
+# FileName=redmine
+[Unit]
+Description=Redmine
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=redmine
+ServiceName=redmine
+Image=docker.io/library/redmine:7.0.2
+PublishPort=127.0.0.1:3000:3000
+# 컨테이너 redmine(999)을 호스트 사용자에 매핑한다. rootless 전용
+# keep-id만 두면 프로세스가 999로 시작해 엔트리포인트의 chown이 빠진다
+# User=0으로 root 시작을 유지하고, chown 대상 999가 호스트 사용자가 되게 한다
+UserNS=keep-id:uid=999,gid=999
+User=0
+# 엔트리포인트가 root로 시작해 files, sqlite를 redmine(999)으로 chown한다. U는 붙이지 않는다
+Volume=%h/.local/share/redmine/files:/usr/src/redmine/files:Z
+Volume=%h/.local/share/redmine/sqlite:/usr/src/redmine/sqlite:Z
+Environment=TZ=Asia/Seoul
+# openssl rand -hex 64 | tr -d '\n' | podman secret create redmine-secret-key-base -
+Secret=redmine-secret-key-base,type=env,target=SECRET_KEY_BASE
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+
+HealthCmd=wget -q -O /dev/null http://localhost:3000/login
+HealthInterval=30s
+HealthTimeout=10s
+HealthRetries=3
+# 첫 실행은 db:migrate가 끝나야 응답한다
+HealthStartPeriod=120s
+HealthOnFailure=kill
+
+[Service]
+ExecStartPre=/usr/bin/mkdir -p %h/.local/share/redmine/files %h/.local/share/redmine/sqlite
+Restart=on-failure
+RestartSec=5
+# 첫 실행 시 이미지 pull과 db:migrate가 기본 제한(90초)을 넘을 수 있다
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
