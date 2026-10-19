@@ -1,11 +1,26 @@
-name: mock
 services:
   wiremock:
     image: docker.io/wiremock/wiremock:latest
     container_name: wiremock
+    restart: on-failure
     ports:
-      - 8080:8080
+      - "127.0.0.1:8080:8080"
     volumes:
-      - ./data:/home/wiremock
-    command: ["--global-response-templating"]
-    restart: unless-stopped
+      # mappings, __files. 읽기 전용이라 관리 API로 저장한 스텁은 파일로 남지 않는다
+      # Docker는 U 옵션을 지원하지 않는다
+      - ./data:/home/wiremock:ro,Z
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/__admin/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

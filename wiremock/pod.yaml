@@ -2,27 +2,122 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: wiremock
-  labels: wiremock
-
+  namespace: wiremock
+  labels:
+    app: wiremock
 spec:
-  restartPolicy: Always
-
+  restartPolicy: OnFailure
   containers:
     - name: wiremock
       image: docker.io/wiremock/wiremock:latest
       ports:
         - containerPort: 8080
           hostPort: 8080
-      volumes:
-        - name: wiremock-data
-          mountPath: /home/wiremock
-      args:
-        - --global-response-templating
+          hostIP: 127.0.0.1
+      envFrom:
+        - configMapRef:
+            name: wiremock-default
+      volumeMounts:
+        - name: wiremock-mappings
+          mountPath: /home/wiremock/mappings
+          readOnly: true
+        - name: wiremock-files
+          mountPath: /home/wiremock/__files
+          readOnly: true
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - NET_RAW
+            - NET_ADMIN
+      startupProbe:
+        exec:
+          command: ["curl", "-fsS", "http://localhost:8080/__admin/health"]
+        periodSeconds: 5
+        failureThreshold: 6
+      livenessProbe:
+        exec:
+          command: ["curl", "-fsS", "http://localhost:8080/__admin/health"]
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
 
   volumes:
-    - name: wiremock-data
-      hostPath: 
-        path: /srv/wiremock
-        type: Directory
+    - name: wiremock-mappings
+      configMap:
+        name: wiremock-mappings
+    - name: wiremock-files
+      configMap:
+        name: wiremock-files
 
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wiremock-default
+  namespace: wiremock
+data:
+  TZ: "Asia/Seoul"
+  JAVA_OPTS: "-Xmx256m"
+  WIREMOCK_OPTIONS: "--global-response-templating --max-request-journal=1000 --disable-banner"
 
+---
+# data/mappings와 같은 내용을 유지
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wiremock-mappings
+  namespace: wiremock
+data:
+  IFX1001.json: |
+    {
+    	"request": { "method": "GET", "url": "/api/IFX1001" },
+    	"response": {
+    		"status": 200,
+    		"bodyFileName": "IFX1001.xml",
+    		"headers": { "Content-Type": "application/xml; charset=UTF-8" }
+    	}
+    }
+  order.json: |
+    {
+      "request": { "method": "GET", "url": "/api/order/1" },
+      "response": {
+        "status": 200,
+        "bodyFileName": "order.xml",
+        "headers": { "Content-Type": "application/xml; charset=UTF-8" }
+      }
+    }
+  user.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPath": "/api/users/1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "id": 1,
+          "name": "Kim"
+        }
+      }
+    }
+
+---
+# data/__files와 같은 내용을 유지
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wiremock-files
+  namespace: wiremock
+data:
+  IFX1001.xml: |
+    <?xml version='1.0' encoding='euc-kr'>
+    <IFX1001>
+    	<RCODE value="000000" />
+    	<RNAME value="홍길동"/>
+    	<RMSG value="" />
+    </IFX1001>
+    </xml>

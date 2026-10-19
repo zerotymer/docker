@@ -1,0 +1,32 @@
+# FileName=wiremock
+[Unit]
+Description=WireMock
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=wiremock
+ServiceName=wiremock
+Image=docker.io/wiremock/wiremock:latest
+PublishPort=127.0.0.1:8080:8080
+Volume=%h/.local/share/wiremock:/home/wiremock:ro,Z,U
+Environment=TZ=Asia/Seoul
+Environment=JAVA_OPTS=-Xmx256m
+Environment="WIREMOCK_OPTIONS=--global-response-templating --max-request-journal=1000 --disable-banner"
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+
+HealthCmd=curl -fsS http://localhost:8080/__admin/health
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=30s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
