@@ -1,0 +1,12 @@
+# Termix 리버스 프록시
+# Caddy는 WebSocket을 그대로 넘기고 요청 본문 크기 제한이 없어 nginx/termix.conf와 같은 동작을 한다.
+# 기본 설정이다. 배포 환경에 맞게 사이트 주소, 업스트림 주소를 수정한다.
+# 인증서는 Caddy가 자동으로 발급한다. 직접 지정하려면 tls <cert> <key>를 추가한다.
+
+termix.example.com {
+	# Caddy가 컨테이너이면 같은 네트워크의 컨테이너 이름(termix:8080)으로 바꾼다
+	reverse_proxy 127.0.0.1:8080 {
+		# 설정을 다시 읽어도 열린 터미널 세션을 바로 끊지 않는다
+		stream_close_delay 5m
+	}
+}

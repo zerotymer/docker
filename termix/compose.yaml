@@ -1,0 +1,28 @@
+services:
+  termix:
+    image: ghcr.io/termix-ssh/termix:latest
+    container_name: termix
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # DB, 암호화 키, 업로드, 녹화. 엔트리포인트가 시작할 때 node(PUID:PGID) 소유로 바꾼다
+      - termix-vol:/app/data
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:30001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  termix-vol:

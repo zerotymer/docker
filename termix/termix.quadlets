@@ -1,59 +1,20 @@
 # FileName=termix
 [Unit]
-Description=Termix Pod
+Description=Termix
 After=network-online.target
 Wants=network-online.target
 
-[Pod]
-PodName=termix
+[Container]
+ContainerName=termix
 ServiceName=termix
+Image=ghcr.io/termix-ssh/termix:latest
 PublishPort=127.0.0.1:8080:8080
-
-[Install]
-WantedBy=default.target
----
-
-# FileName=termix-vol
-[Volume]
-VolumeName=termix-vol
-Label=app=termix
-
----
-# FileName=termix-guacd
-[Unit]
-Description=Termix guacd
-
-[Container]
-Pod=termix.pod
-ContainerName=termix-guacd
-Image=docker.io/guacamole/guacd:1.6.0
-Volume=termix-vol.volume:/termix-data
-NoNewPrivileges=true
-AutoUpdate=registry
-
-[Service]
-Restart=on-failure
-RestartSec=5
-
----
-# FileName=termix-app
-[Unit]
-Description=Termix App
-Requires=termix-guacd.service
-After=termix-guacd.service
-
-[Container]
-Pod=termix.pod
-ContainerName=termix-app
-Image=ghcr.io/lukegus/termix:latest
-Volume=termix-vol.volume:/app/data
+UserNS=keep-id:uid=1000,gid=1000
+Volume=%h/.local/share/termix:/app/data:Z,U
+Environment=TZ=Asia/Seoul
 Environment=PORT=8080
-# Pod 안의 컨테이너는 localhost로 서로 통신한다
-Environment=GUACD_HOST=127.0.0.1
-Environment=GUACD_TUNNEL_HOST=127.0.0.1
-Environment=GUACD_RECORDING_PATH=/termix-data/session_recordings/guacamole
-Environment=GUACD_DRIVE_PATH=/termix-data/rdp-drive
 NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
 AutoUpdate=registry
 
 HealthCmd=wget -q -O /dev/null http://localhost:30001/health
@@ -64,5 +25,11 @@ HealthStartPeriod=60s
 HealthOnFailure=kill
 
 [Service]
+# 바인드 마운트 원본이 없으면 컨테이너가 시작되지 않는다
+ExecStartPre=/usr/bin/mkdir -p %h/.local/share/termix
 Restart=on-failure
 RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
