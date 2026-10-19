@@ -1,0 +1,35 @@
+# AdGuard Home 리버스 프록시 (edge 종료)
+# TLS는 Caddy에서 끝내고 AdGuard Home 웹 UI(80)에는 HTTP로 넘긴다.
+# AdGuard Home 암호화 설정의 HTTPS 리다이렉트(force_https)는 끈다.
+# 웹 UI는 내부망에서만 허용하고, DNS-over-HTTPS(/dns-query)는 어디서나 허용한다.
+# 기본 설정이다. 배포 환경에 맞게 사이트 주소, 업스트림 주소, 허용 대역을 수정한다.
+# 인증서는 Caddy가 자동으로 발급한다. 직접 지정하려면 tls <cert> <key>를 추가한다.
+#
+# 다른 프록시나 로드밸런서 뒤에 있으면 전역 옵션 servers { trusted_proxies ... }를
+# 설정하고 remote_ip 대신 client_ip를 사용한다.
+
+adguard.example.com {
+	# 사용자 규칙, 허용/차단 목록을 한 번에 저장할 때 본문이 커질 수 있다
+	request_body {
+		max_size 10MB
+	}
+
+	# DNS-over-HTTPS. /dns-query/<ClientID> 형식도 포함한다
+	# AdGuardHome.yaml에서 tls.allow_unencrypted_doh: true가 필요하다
+	@doh path /dns-query /dns-query/*
+	handle @doh {
+		# Caddy가 컨테이너이면 같은 네트워크의 컨테이너 이름(adguard:80)으로 바꾼다
+		reverse_proxy 127.0.0.1:80
+	}
+
+	# 웹 UI
+	@ui_allowed remote_ip 127.0.0.0/8 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
+	handle @ui_allowed {
+		reverse_proxy 127.0.0.1:80
+	}
+
+	# 외부에서는 경로가 없는 것처럼 404를 돌려준다
+	handle {
+		respond 404
+	}
+}

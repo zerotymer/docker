@@ -1,0 +1,41 @@
+# FileName=adguard
+[Unit]
+Description=AdGuard Home
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=adguard
+ServiceName=adguard
+Image=docker.io/adguard/adguardhome:latest
+# DNS
+PublishPort=53:53/tcp
+PublishPort=53:53/udp
+# 웹 UI, DNS-over-HTTPS
+PublishPort=80:80/tcp
+PublishPort=443:443/tcp
+PublishPort=443:443/udp
+# 최초 설정 마법사
+PublishPort=127.0.0.1:3000:3000/tcp
+# DNS-over-TLS, DNS-over-QUIC
+PublishPort=853:853/tcp
+PublishPort=853:853/udp
+# DNSCrypt
+PublishPort=5443:5443/tcp
+PublishPort=5443:5443/udp
+# Z: SELinux 전용 라벨, U: 소유권을 컨테이너 사용자(root)에 맞춤
+Volume=%h/.local/share/adguard/work:/opt/adguardhome/work:Z,U
+Volume=%h/.local/share/adguard/conf:/opt/adguardhome/conf:Z,U
+Environment=TZ=Asia/Seoul
+NoNewPrivileges=true
+AutoUpdate=registry
+
+[Service]
+# 바인드 마운트 원본이 없으면 컨테이너가 시작되지 않는다
+ExecStartPre=mkdir -p %h/.local/share/adguard/work %h/.local/share/adguard/conf
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

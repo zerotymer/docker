@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: adguard-home
-  namespace: adguard-home
+  name: adguard
+  namespace: adguard
   labels:
-    app: adguard-home
+    app: adguard
 spec:
   restartPolicy: Always
   containers:
-    - name: adguard-home
+    - name: adguard
       image: docker.io/adguard/adguardhome:latest
       ports:
         # DNS
@@ -47,31 +47,41 @@ spec:
         - containerPort: 5443
           hostPort: 5443
           protocol: UDP
-      env:
-        - name: TZ
-          value: Asia/Seoul
+      envFrom:
+        - configMapRef:
+            name: adguard-default
       volumeMounts:
-        - name: adguard-home-work
+        - name: adguard-work
           mountPath: /opt/adguardhome/work
-        - name: adguard-home-conf
+        - name: adguard-conf
           mountPath: /opt/adguardhome/conf
       securityContext:
         allowPrivilegeEscalation: false
 
   volumes:
-    - name: adguard-home-work
+    - name: adguard-work
       persistentVolumeClaim:
-        claimName: adguard-home-work
-    - name: adguard-home-conf
+        claimName: adguard-work
+    - name: adguard-conf
       persistentVolumeClaim:
-        claimName: adguard-home-conf
+        claimName: adguard-conf
+
+---
+# default.env와 같은 값을 유지
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adguard-default
+  namespace: adguard
+data:
+  TZ: "Asia/Seoul"
 
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: adguard-home-work
-  namespace: adguard-home
+  name: adguard-work
+  namespace: adguard
 spec:
   accessModes:
     - ReadWriteOnce
@@ -83,8 +93,8 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: adguard-home-conf
-  namespace: adguard-home
+  name: adguard-conf
+  namespace: adguard
 spec:
   accessModes:
     - ReadWriteOnce
