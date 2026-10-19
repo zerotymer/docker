@@ -1,0 +1,28 @@
+services:
+  linkding:
+    image: docker.io/sissbruecker/linkding:latest-alpine
+    container_name: linkding
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      # 엔트리포인트가 root로 시작해 데이터 디렉터리를 www-data(33)로 chown한다
+      - linkding-vol:/etc/linkding/data
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  linkding-vol:

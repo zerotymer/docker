@@ -1,40 +1,26 @@
 # FileName=linkding
 [Unit]
-Description=linkding Pod
+Description=linkding
 After=network-online.target
 Wants=network-online.target
 
-[Pod]
-PodName=linkding
-ServiceName=linkding
-PublishPort=127.0.0.1:9090:9090
-
-[Install]
-WantedBy=default.target
----
-
-# FileName=linkding-vol
-[Volume]
-VolumeName=linkding-vol
-Label=app=linkding
-
----
-# FileName=linkding-app
-[Unit]
-Description=linkding App
-
 [Container]
-Pod=linkding.pod
-ContainerName=linkding-container
+ContainerName=linkding
+ServiceName=linkding
 Image=docker.io/sissbruecker/linkding:latest-alpine
-Volume=linkding-vol.volume:/etc/linkding/data
+PublishPort=127.0.0.1:9090:9090
+# 엔트리포인트가 root로 시작해 데이터 디렉터리를 www-data(33)로 chown하므로 U는 붙이지 않는다
+Volume=linkding-vol.volume:/etc/linkding/data:Z
 Environment=LD_SUPERUSER_NAME=admin
-# printf '%s' 'password' | podman secret create linkding-superuser-password -
+# 리버스 프록시 뒤에서 HTTPS로 열 때 외부 주소. 없으면 로그인 등 POST가 CSRF 오류로 막힌다
+# Environment=LD_CSRF_TRUSTED_ORIGINS=https://linkding.example.com
+# printf '%s' '<비밀번호>' | podman secret create linkding-superuser-password -
 Secret=linkding-superuser-password,type=env,target=LD_SUPERUSER_PASSWORD
 NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
 AutoUpdate=registry
 
-HealthCmd=curl -f http://localhost:9090/health
+HealthCmd=curl -fsS http://localhost:9090/health
 HealthInterval=30s
 HealthTimeout=5s
 HealthRetries=3
@@ -44,3 +30,14 @@ HealthOnFailure=kill
 [Service]
 Restart=on-failure
 RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
+
+---
+
+# FileName=linkding-vol
+[Volume]
+VolumeName=linkding-vol
+Label=app=linkding

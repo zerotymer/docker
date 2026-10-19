@@ -5,10 +5,8 @@ metadata:
   namespace: linkding
   labels:
     app: linkding
-
 spec:
   restartPolicy: Always
-
   containers:
     - name: linkding
       image: docker.io/sissbruecker/linkding:latest-alpine
@@ -17,17 +15,28 @@ spec:
           hostPort: 9090
           hostIP: 127.0.0.1
       envFrom:
-        - configMap:
+        - configMapRef:
             name: linkding-default
         - secretRef:
             name: linkding-secret
       volumeMounts:
+        # 엔트리포인트가 root로 시작해 데이터 디렉터리를 www-data(33)로 chown한다
         - name: linkding-vol
           mountPath: /etc/linkding/data
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - NET_RAW
+            - NET_ADMIN
+      startupProbe:
+        exec:
+          command: ["curl", "-fsS", "http://localhost:9090/health"]
+        periodSeconds: 5
+        failureThreshold: 12
       livenessProbe:
         exec:
-          command: ["curl", "-f", "http://localhost:9090/health"]
-        initialDelaySeconds: 20
+          command: ["curl", "-fsS", "http://localhost:9090/health"]
         periodSeconds: 30
         timeoutSeconds: 5
         failureThreshold: 3
@@ -60,7 +69,7 @@ data:
   LD_SUPERUSER_NAME: "admin"
 
 ---
-# 최종 비밀값
+# 예제 값. 실제 비밀번호로 바꾼 파일은 커밋하지 않는다
 apiVersion: v1
 kind: Secret
 metadata:
@@ -68,5 +77,4 @@ metadata:
   namespace: linkding
 type: Opaque
 data:
-  LD_SUPERUSER_NAME: "YWRtaW4=" # admin
   LD_SUPERUSER_PASSWORD: "cGFzc3dvcmQ=" # password
