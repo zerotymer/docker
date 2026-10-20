@@ -1,0 +1,92 @@
+# FileName=dtrack-data
+[Volume]
+VolumeName=dtrack-data
+Label=app=dtrack
+
+---
+
+# FileName=dtrack-api
+[Unit]
+Description=Dependency-Track API server
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=dtrack-api
+ServiceName=dtrack-api
+Image=docker.io/dependencytrack/apiserver:latest
+PublishPort=127.0.0.1:8082:8080
+# 관리 포트(상태 확인 /health, 메트릭 /metrics). 필요하면 열어도 된다
+# 메트릭은 DT_METRICS_ENABLED=true일 때만 나온다
+# PublishPort=127.0.0.1:9000:9000
+# 같은 호스트의 postgresql/ 처럼 127.0.0.1에만 열린 DB를 쓰려면 활성화한다. rootless 전용
+# 컨테이너 안의 127.0.0.1:5432를 호스트 127.0.0.1:5432로 넘기므로 DT_DATASOURCE_URL 호스트를 127.0.0.1로 바꾼다
+# Network=pasta:-T,5432
+# 이미지는 1000:0으로 실행하고 /data는 dtrack:0, g=u다
+# 이름 있는 볼륨은 처음 쓸 때 이 소유자를 복사하므로 U를 붙이지 않는다
+Volume=dtrack-data.volume:/data:Z
+# PostgreSQL 접속 정보. 데이터베이스와 역할은 미리 만든다 (README 참고)
+# host.containers.internal은 Podman이 호스트 주소로 넣어 준다. 127.0.0.1에만 열린 DB에는 닿지 않는다
+Environment=DT_DATASOURCE_URL=jdbc:postgresql://host.containers.internal:5432/dtrack
+Environment=DT_DATASOURCE_USERNAME=dtrack
+Environment=TZ=Asia/Seoul
+# printf '%s' '<비밀번호>' | podman secret create dtrack-db-password -
+Secret=dtrack-db-password,type=env,target=DT_DATASOURCE_PASSWORD
+# 힙은 이미지 기본 MaxRAMPercentage=80으로 이 제한의 80%다
+Memory=4g
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+StopTimeout=60
+
+# 이미지 HEALTHCHECK와 같다. 이미지에 curl이 없어 BusyBox wget을 쓴다
+HealthCmd=wget -q -Y off -T 3 -O /dev/null http://127.0.0.1:9000/health
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=10
+# 첫 실행은 스키마 마이그레이션이 끝나야 응답한다
+HealthStartPeriod=180s
+HealthOnFailure=kill
+
+[Service]
+# 데이터베이스에 접속하지 못하면 종료되고 Restart가 다시 시도한다
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+# StopTimeout(60초)보다 길어야 systemd가 먼저 프로세스를 죽이지 않는다
+TimeoutStopSec=90
+
+[Install]
+WantedBy=default.target
+
+---
+
+# FileName=dtrack-frontend
+[Unit]
+Description=Dependency-Track Frontend
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=dtrack-frontend
+ServiceName=dtrack-frontend
+Image=docker.io/dependencytrack/frontend:latest
+PublishPort=127.0.0.1:8083:8080
+# 브라우저가 여는 API 주소. 프론트엔드 컨테이너는 API에 접속하지 않고 정적 파일만 제공한다
+Environment=API_BASE_URL=http://localhost:8082
+Environment=TZ=Asia/Seoul
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+
+HealthCmd=wget -q -T 3 -O /dev/null http://127.0.0.1:8080/
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=10s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
