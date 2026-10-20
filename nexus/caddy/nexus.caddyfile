@@ -1,0 +1,21 @@
+# Nexus Repository 리버스 프록시
+# 아티팩트 업로드를 위해 요청 크기를 nginx와 같이 1GB로 두고, 큰 파일 전송이 끊기지 않도록
+# 타임아웃을 늘리고 응답을 바로 흘려보낸다 (Sonatype 리버스 프록시 예시 기준).
+# Docker 저장소 커넥터 포트는 포함하지 않는다. 필요하면 사이트 블록을 따로 만든다.
+# 기본 설정이다. 배포 환경에 맞게 사이트 주소, 업스트림 주소를 수정한다.
+# 인증서는 Caddy가 자동으로 발급한다. 직접 지정하려면 tls <인증서> <키>를 추가한다.
+
+nexus.example.com {
+	request_body {
+		max_size 1GB
+	}
+
+	# Caddy가 컨테이너이면 같은 네트워크의 컨테이너 이름(nexus:8081)으로 바꾼다
+	reverse_proxy 127.0.0.1:8081 {
+		flush_interval -1
+		transport http {
+			write_timeout 120s
+			read_timeout 300s
+		}
+	}
+}
