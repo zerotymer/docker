@@ -1,0 +1,39 @@
+# FileName=svn-server
+[Unit]
+Description=SVN Server
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=svn-server
+ServiceName=svn-server
+Image=docker.io/garethflowers/svn-server:edge
+PublishPort=3690:3690
+# 이미지는 root로 실행된다. U는 기동마다 저장소 전체를 chown하므로 붙이지 않는다
+Volume=svn-server-vol.volume:/var/opt/svn:Z
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+AutoUpdate=registry
+
+# 값이 셸 명령으로 /bin/sh -c에 전달된다
+HealthCmd="netstat -ln | grep -q 3690"
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=10s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
+
+---
+
+# FileName=svn-server-vol
+[Volume]
+VolumeName=svn-server-vol
+Label=app=svn-server
