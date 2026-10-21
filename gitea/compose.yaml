@@ -1,0 +1,31 @@
+services:
+  gitea:
+    # rootless 이미지는 UID 1000으로 실행하고 내장 SSH 서버를 2222에서 연다
+    image: docker.gitea.com/gitea:latest-rootless
+    container_name: gitea
+    restart: always
+    ports:
+      # 웹 UI는 리버스 프록시로만 연다
+      - "127.0.0.1:3000:3000"
+      # Git SSH는 프록시를 거치지 않으므로 모든 인터페이스에 연다
+      - "2222:2222"
+    volumes:
+      # 저장소, SQLite DB, LFS, SSH 호스트 키. 컨테이너 UID 1000이 쓸 수 있어야 한다
+      - ./.data/data:/var/lib/gitea:Z
+      # app.ini
+      - ./.data/config:/etc/gitea:Z
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

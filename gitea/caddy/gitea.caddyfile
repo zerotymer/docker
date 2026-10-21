@@ -1,0 +1,19 @@
+# Gitea 리버스 프록시
+# nginx/gitea.conf와 같이 요청 본문을 512MB로 제한한다.
+# 28부터 쓰는 WebSocket(/-/ws)은 reverse_proxy가 Upgrade 헤더를 그대로 넘긴다.
+# Caddy는 업스트림 타임아웃 기본값이 없어 Nginx처럼 따로 늘리지 않는다.
+# 기본 설정이다. 배포 환경에 맞게 사이트 주소, 업스트림 주소를 수정한다.
+# 인증서는 Caddy가 자동으로 발급한다. 직접 지정하려면 tls <인증서> <키>를 추가한다.
+# Git SSH(2222)는 이 프록시를 거치지 않는다.
+
+gitea.example.com {
+	request_body {
+		max_size 512MB
+	}
+
+	# Caddy가 컨테이너이면 같은 네트워크의 컨테이너 이름(gitea:3000)으로 바꾼다
+	reverse_proxy 127.0.0.1:3000 {
+        header_up X-Forwarded-Proto https
+        header_up Host {host}
+  }
+}

@@ -1,37 +1,56 @@
-# FileName=gitea
-[Unit]
-Description=Gitea Pod
-After=network-online.target
-Wants=network-online.target
-
-[Pod]
-PodName=gitea
-ServiceName=gitea
-PublishPort=3000:3000
-PublishPort=2222:22
-
-[Install]
-WantedBy=default.target
----
-
-# FileName=gitea-vol
+# FileName=gitea-data
 [Volume]
-VolumeName=gitea-vol
+VolumeName=gitea-data
 Label=app=gitea
 
 ---
-# FileName=gitea-app
+
+# FileName=gitea-config
+[Volume]
+VolumeName=gitea-config
+Label=app=gitea
+
+---
+
+# FileName=gitea
 [Unit]
-Description=Gitea App
+Description=Gitea
+After=network-online.target
+Wants=network-online.target
 
 [Container]
-Pod=gitea.pod
-ContainerName=gitea-app
-Image=docker.gitea.com/gitea:1.26.1
-Volume=gitea-vol.volume:/data
+ContainerName=gitea
+ServiceName=gitea
+Image=docker.gitea.com/gitea:latest-rootless
+# 웹 UI는 리버스 프록시로만 연다. Git SSH는 모든 인터페이스에 연다
+PublishPort=127.0.0.1:3000:3000
+PublishPort=2222:2222
+# rootless 이미지는 UID 1000으로 실행하고 내장 SSH 서버를 2222에서 연다
+UserNS=keep-id:uid=1000,gid=1000
+Volume=gitea-data.volume:/var/lib/gitea
+# app.ini
+Volume=gitea-config.volume:/etc/gitea
+# default.env와 같은 값을 유지한다. 주소는 실제 값으로 바꾼다
 Environment=TZ=Asia/Seoul
-Environment=USER_UID=1000
-Environment=USER_GID=1000
+Environment=GITEA__server__ROOT_URL=http://localhost:3000/
+Environment=GITEA__server__HTTP_PORT=3000
+Environment=GITEA__server__SSH_DOMAIN=localhost
+Environment=GITEA__server__START_SSH_SERVER=true
+Environment=GITEA__server__SSH_PORT=2222
+Environment=GITEA__server__SSH_LISTEN_PORT=2222
+Environment=GITEA__server__LFS_START_SERVER=true
+Environment=GITEA__server__SSH_SERVER_HOST_KEYS=ssh/ssh_host_ed25519_key,ssh/ssh_host_rsa_key
+Environment=GITEA__database__DB_TYPE=sqlite3
+Environment=GITEA__database__PATH=/var/lib/gitea/data/gitea.db
+Environment=GITEA__service__DISABLE_REGISTRATION=true
+Environment=GITEA__service__REQUIRE_SIGNIN_VIEW=true
+Environment=GITEA__service__REGISTER_EMAIL_CONFIRM=false
+Environment=GITEA__mailer__ENABLED=false
+Environment=GITEA__openid__ENABLE_OPENID_SIGNIN=false
+Environment=GITEA__openid__ENABLE_OPENID_SIGNUP=false
+Environment=GITEA__actions__ENABLED=true
+Environment=GITEA__log__LEVEL=Info
+Environment=GITEA__time__DEFAULT_UI_LOCATION=Asia/Seoul
 NoNewPrivileges=true
 DropCapability=NET_RAW NET_ADMIN
 
@@ -45,3 +64,8 @@ HealthOnFailure=kill
 [Service]
 Restart=on-failure
 RestartSec=5
+# 첫 실행 시 이미지 pull이 기본 제한(90초)을 넘을 수 있다
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
