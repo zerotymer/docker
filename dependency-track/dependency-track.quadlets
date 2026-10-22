@@ -16,6 +16,7 @@ ContainerName=dtrack-api
 ServiceName=dtrack-api
 Image=docker.io/dependencytrack/apiserver:latest
 PublishPort=127.0.0.1:8082:8080
+Network=postgresql.network
 # 관리 포트(상태 확인 /health, 메트릭 /metrics). 필요하면 열어도 된다
 # 메트릭은 DT_METRICS_ENABLED=true일 때만 나온다
 # PublishPort=127.0.0.1:9000:9000
