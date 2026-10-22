@@ -20,7 +20,7 @@
 | `compose.yaml` | Docker Compose / podman-compose (`postgres` 프로필로 PostgreSQL 포함) |
 | `default.env` | Compose 기본 환경 변수 (`.env`로 덮어쓰기 가능) |
 | `example.env` | `.env`에 적을 키와 예시 |
-| `wiki.js.quadlets` | Podman Quadlet (볼륨, Wiki.js) |
+| `wiki.js.quadlets` | Podman Quadlet (볼륨, 네트워크 `wikijs-network`, Wiki.js) |
 | `pod.yaml` | `podman kube play`용 Pod, PVC, ConfigMap, Secret |
 | `nginx/wiki.js.conf` | Nginx `server` 블록 |
 | `caddy/wiki.js.caddyfile` | Caddy 사이트 블록 |
@@ -149,6 +149,16 @@ podman kube down pod.yaml
 Pod 이름은 `wikijs`, 컨테이너 이름은 `wikijs-wiki`입니다. `podman kube down`은 PVC 볼륨을 지우지 않습니다. 데이터까지 지우려면 `podman volume rm wikijs-data`를 실행합니다.
 
 Quadlet과 kube play는 같은 볼륨 `wikijs-data`를 씁니다. Compose 볼륨은 프로젝트 접두어가 붙어 `wikijs_wikijs-data`입니다. 프로젝트 이름은 디렉터리 이름 `wiki.js`에서 `.`을 뺀 `wikijs`입니다. 세 방식 모두 같은 호스트 포트를 쓰므로 동시에 실행하지 않습니다.
+
+## 연동 서비스 네트워크
+
+[`wikijs-gateway/`](../wikijs-gateway/README.md)처럼 Wiki.js GraphQL API(`/graphql`)를 부르는 서비스는 `127.0.0.1:3001`에 닿지 못합니다. 컨테이너 안의 `127.0.0.1`은 그 컨테이너 자신입니다. 대신 `wikijs-network`에 붙어 `http://wikijs:3000/graphql`로 접속합니다.
+
+| 실행 방식 | 네트워크 | Wiki.js 주소 |
+|---|---|---|
+| Compose | 기본 네트워크 이름을 `wikijs-network`로 고정. 연동 서비스는 `external: true`로 붙음 | `wikijs` (컨테이너 이름), `wiki` (서비스 이름) |
+| Quadlet | `wikijs.network` 유닛(`wikijs-network`). 연동 서비스는 `Network=wikijs.network` | `wikijs` |
+| kube play | `podman network create wikijs-network` 후 `podman kube play --network wikijs-network pod.yaml` | `wikijs-wiki` (컨테이너 이름) |
 
 ## 리버스 프록시
 

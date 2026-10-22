@@ -6,6 +6,14 @@ Label=app=wikijs
 ---
 
 # FileName=wikijs
+[Network]
+NetworkName=wikijs-network
+Driver=bridge
+Label=app=wikijs
+
+---
+
+# FileName=wikijs
 [Unit]
 Description=Wiki.js
 After=network-online.target
@@ -17,6 +25,8 @@ ServiceName=wikijs
 Image=ghcr.io/requarks/wiki:latest
 PublishPort=127.0.0.1:3000:3000
 Network=postgres.network
+# wikijs-gateway 같은 연동 서비스가 컨테이너 이름 wikijs로 접속하는 네트워크
+Network=wikijs.network
 # 이미지가 VOLUME으로 선언한 경로다. /wiki/data에 마운트하면 이 경로는 익명 볼륨으로 따로 잡힌다
 # 이미지는 node(1000)로 실행하고 이 경로는 node:node다
 # 이름 있는 볼륨은 처음 쓸 때 이 소유자를 복사하므로 U를 붙이지 않는다

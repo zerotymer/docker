@@ -75,6 +75,11 @@ services:
       retries: 10
       start_period: 10s
 
+networks:
+  # wikijs-gateway 같은 연동 서비스가 외부 네트워크로 붙어 컨테이너 이름 wikijs로 접속한다
+  default:
+    name: wikijs-network
+
 volumes:
   wikijs-data:
   wikijs-postgres-data:
