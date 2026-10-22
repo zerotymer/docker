@@ -1,0 +1,149 @@
+# PostgreSQL, API, 프론트엔드를 한 Pod에 둔다. 컨테이너 포트가 겹치지 않는다.
+# 컨테이너끼리는 127.0.0.1로 접속한다. PostgreSQL 포트는 호스트에 열지 않는다.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: llm-registry
+  namespace: llm-registry
+  labels:
+    app: llm-registry
+spec:
+  restartPolicy: Always
+  containers:
+    - name: postgres
+      image: docker.io/library/postgres:latest
+      envFrom:
+        - configMapRef:
+            name: llm-registry-db
+        - secretRef:
+            name: llm-registry-db
+      volumeMounts:
+        # 18부터 이미지가 /var/lib/postgresql/18/docker에 데이터를 만든다
+        - name: llm-registry-db
+          mountPath: /var/lib/postgresql
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - NET_RAW
+            - NET_ADMIN
+      livenessProbe:
+        exec:
+          command: ["pg_isready", "-U", "llmref", "-d", "llmref"]
+        periodSeconds: 10
+        timeoutSeconds: 3
+        failureThreshold: 5
+
+    - name: api
+      image: docker.io/zerotymer/llm-registry-api:latest
+      ports:
+        # REST(/docs), MCP(/mcp/) 직접 접속용
+        - containerPort: 8000
+          hostPort: 8000
+          hostIP: 127.0.0.1
+      env:
+        - name: TZ
+          value: "Asia/Seoul"
+        # PostgreSQL이 준비되기 전에는 마이그레이션에서 종료되고 restartPolicy가 다시 시작한다
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: llm-registry-db
+              key: DATABASE_URL
+        # JWT 서명 키를 고정하려면 Secret llm-registry-db에 JWT_SECRET을 넣고 주석을 푼다
+        # - name: JWT_SECRET
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: llm-registry-db
+        #       key: JWT_SECRET
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - NET_RAW
+            - NET_ADMIN
+      startupProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        periodSeconds: 5
+        failureThreshold: 24
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
+
+    - name: frontend
+      image: docker.io/zerotymer/llm-registry-front:latest
+      ports:
+        # gitea, adguard가 127.0.0.1:3000을 쓴다
+        - containerPort: 3000
+          hostPort: 3030
+          hostIP: 127.0.0.1
+      env:
+        - name: TZ
+          value: "Asia/Seoul"
+        # 서버 쪽에서 쓰는 API 주소. 브라우저에는 나가지 않는다
+        - name: BACKEND_API_URL
+          value: "http://127.0.0.1:8000"
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - NET_RAW
+            - NET_ADMIN
+      livenessProbe:
+        httpGet:
+          path: /login
+          port: 3000
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
+
+  volumes:
+    - name: llm-registry-db
+      persistentVolumeClaim:
+        claimName: llm-registry-db
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: llm-registry-db
+  namespace: llm-registry
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# default.env와 같은 값
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-registry-db
+  namespace: llm-registry
+data:
+  TZ: "Asia/Seoul"
+  PGTZ: "Asia/Seoul"
+  POSTGRES_DB: "llmref"
+  POSTGRES_USER: "llmref"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: llm-registry-db
+  namespace: llm-registry
+type: Opaque
+stringData:
+  # 실행 전 실제 비밀번호로 교체. 두 값의 비밀번호를 같게 둔다
+  # 비밀번호를 넣은 pod.yaml은 커밋하지 않는다
+  POSTGRES_PASSWORD: "llmref"
+  DATABASE_URL: "postgresql+asyncpg://llmref:llmref@127.0.0.1:5432/llmref"
+  # JWT_SECRET: "change-me"

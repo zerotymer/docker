@@ -1,0 +1,91 @@
+# PostgreSQL, API, 프론트엔드를 함께 띄운다.
+# 브라우저는 프론트엔드만 연다. 프론트엔드가 서버 쪽에서 BACKEND_API_URL로 API를 호출한다.
+services:
+  postgres:
+    image: docker.io/library/postgres:latest
+    container_name: llm-registry-db
+    restart: unless-stopped
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    environment:
+      PGTZ: Asia/Seoul
+    volumes:
+      # 18부터 이미지가 /var/lib/postgresql/18/docker에 데이터를 만든다
+      # 이름 있는 볼륨은 엔진이 SELinux 레이블을 관리한다. 바인드 마운트로 바꾸면 :Z를 붙인다
+      - llm-registry-db:/var/lib/postgresql
+    shm_size: 256mb
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  api:
+    image: docker.io/zerotymer/llm-registry-api:latest
+    container_name: llm-registry-api
+    restart: unless-stopped
+    # DATABASE_URL, JWT_SECRET을 읽는다. 엔트리포인트가 시작할 때 alembic upgrade head를 실행한다
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    ports:
+      # REST(/docs), MCP(/mcp/) 직접 접속용. 브라우저와 에이전트는 프론트엔드를 거친다
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      # 이미지(python:3.12-slim)에 curl, wget이 없다
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # 첫 실행은 마이그레이션이 끝나야 응답한다
+      start_period: 60s
+
+  frontend:
+    image: docker.io/zerotymer/llm-registry-front:latest
+    container_name: llm-registry-front
+    restart: unless-stopped
+    # default.env, .env는 DB 비밀번호가 있어 넘기지 않는다
+    environment:
+      TZ: Asia/Seoul
+      # 서버 쪽(Server Action, /api/v1 게이트웨이)에서 쓰는 API 주소. 브라우저에는 나가지 않는다
+      BACKEND_API_URL: http://api:8000
+    ports:
+      # gitea, adguard가 127.0.0.1:3000을 쓴다
+      - "127.0.0.1:3030:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      # node:20-alpine의 BusyBox wget
+      test: ["CMD", "wget", "-q", "-T", "3", "-O", "/dev/null", "http://127.0.0.1:3000/login"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  llm-registry-db:

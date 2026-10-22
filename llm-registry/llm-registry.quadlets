@@ -1,0 +1,91 @@
+# FileName=llm-registry
+[Pod]
+PodName=llm-registry
+ServiceName=llm-registry-pod
+# API와 프론트엔드가 네트워크를 공유한다. 프론트엔드는 127.0.0.1:8000으로 API에 접속한다
+# PostgreSQL은 포함하지 않는다. API의 DATABASE_URL로 접속 정보를 넘긴다
+# postgresql/postgresql.quadlets의 postgres-network에 붙어 컨테이너 이름 postgres로 접속한다
+# 다른 호스트의 DB라면 이 줄을 지우고 DATABASE_URL에 그 주소를 적는다
+Network=postgres.network
+# 같은 호스트의 127.0.0.1에만 열린 DB라면 위 줄 대신 아래 줄을 쓰고 DATABASE_URL 호스트를 127.0.0.1로 바꾼다. rootless 전용
+# Network=pasta:-T,5432
+# gitea, adguard가 127.0.0.1:3000을 쓴다
+PublishPort=127.0.0.1:3030:3000
+# REST(/docs), MCP(/mcp/) 직접 접속용. 브라우저와 에이전트는 프론트엔드를 거친다
+PublishPort=127.0.0.1:8000:8000
+
+---
+
+# FileName=llm-registry-api
+[Unit]
+Description=LLM Registry API
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=llm-registry-api
+ServiceName=llm-registry-api
+Image=docker.io/zerotymer/llm-registry-api:latest
+Pod=llm-registry.pod
+Environment=TZ=Asia/Seoul
+# PostgreSQL 접속 정보. 데이터베이스와 역할은 미리 만든다 (README 참고)
+# 설치 전에 비밀번호를 실제 값으로 바꾼다. 비밀번호를 넣은 파일은 커밋하지 않는다
+Environment=DATABASE_URL=postgresql+asyncpg://llmref:llmref@postgres:5432/llmref
+# JWT 서명 키를 고정하려면 주석을 푼다. 없으면 기동할 때마다 새로 만들어 세션이 끊긴다
+# openssl rand -hex 32 | tr -d '\n' | podman secret create llm-registry-jwt-secret -
+# Secret=llm-registry-jwt-secret,type=env,target=JWT_SECRET
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+
+# 이미지(python:3.12-slim)에 curl, wget이 없다
+HealthCmd=python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+# 첫 실행은 마이그레이션이 끝나야 응답한다
+HealthStartPeriod=60s
+HealthOnFailure=kill
+
+[Service]
+# 데이터베이스에 접속하지 못하면 마이그레이션에서 종료되고 Restart가 다시 시도한다
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
+
+---
+
+# FileName=llm-registry-front
+[Unit]
+Description=LLM Registry Frontend
+Wants=llm-registry-api.service
+After=llm-registry-api.service
+
+[Container]
+ContainerName=llm-registry-front
+ServiceName=llm-registry-front
+Image=docker.io/zerotymer/llm-registry-front:latest
+Pod=llm-registry.pod
+Environment=TZ=Asia/Seoul
+# 서버 쪽(Server Action, /api/v1 게이트웨이)에서 쓰는 API 주소. 브라우저에는 나가지 않는다
+Environment=BACKEND_API_URL=http://127.0.0.1:8000
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+
+# node:20-alpine의 BusyBox wget
+HealthCmd=wget -q -T 3 -O /dev/null http://127.0.0.1:3000/login
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=10s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

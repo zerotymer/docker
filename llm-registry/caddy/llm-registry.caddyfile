@@ -1,0 +1,30 @@
+# LLM Registry 리버스 프록시
+# 프론트엔드만 연다. 웹 UI, 에이전트 API(/api/v1/*), MCP(/api/v1/mcp)가 모두 프론트엔드를 거친다.
+# API 포트(127.0.0.1:8000)는 공개하지 않는다.
+# 기본 설정이다. 배포 환경에 맞게 사이트 주소, 업스트림 주소를 수정한다.
+# 인증서는 Caddy가 자동으로 발급한다. 직접 지정하려면 tls <인증서> <키>를 추가한다.
+
+llm-registry.example.com {
+	# ingest 요청 본문. nginx와 같이 32MB로 둔다
+	request_body {
+		max_size 32MB
+	}
+
+	# MCP streamable-http. SSE 응답을 버퍼링하지 않고 긴 연결을 유지한다
+	@mcp path /api/v1/mcp /api/v1/mcp/*
+	handle @mcp {
+		# Caddy가 컨테이너이면 같은 네트워크의 컨테이너 이름(llm-registry-front:3000)으로 바꾼다
+		reverse_proxy 127.0.0.1:3030 {
+			flush_interval -1
+			transport http {
+				read_timeout 3600s
+				write_timeout 3600s
+			}
+		}
+	}
+
+	handle {
+		# Caddy가 컨테이너이면 같은 네트워크의 컨테이너 이름(llm-registry-front:3000)으로 바꾼다
+		reverse_proxy 127.0.0.1:3030
+	}
+}
