@@ -1,0 +1,51 @@
+# FileName=wikijs-gateway-audit
+[Volume]
+VolumeName=wikijs-gateway-audit
+Label=app=wikijs-gateway
+
+---
+
+# FileName=wikijs-gateway
+[Unit]
+Description=Wiki.js Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=wikijs-gateway
+ServiceName=wikijs-gateway
+Image=docker.io/zerotymer/wikijs-gateway:latest
+# 읽기 API와 /mcp 읽기 도구는 인증이 없다. 외부에 열지 않는다
+PublishPort=127.0.0.1:28081:8080
+# wiki.js/wiki.js.quadlets의 wikijs-network에 붙어 컨테이너 이름 wikijs로 접속한다
+# wikijs 유닛을 먼저 설치해야 한다
+Network=wikijs.network
+# 감사 기록. 이미지가 /audit를 nobody:nogroup으로 만든다
+# 이름 있는 볼륨은 처음 쓸 때 이 소유자를 복사하므로 U를 붙이지 않는다
+Volume=wikijs-gateway-audit.volume:/audit:Z
+Environment=WIKIJS_GRAPHQL_URL=http://wikijs:3000/graphql
+Environment=TZ=Asia/Seoul
+# printf '%s' '<Wiki.js API 키>' | podman secret create wikijs-gateway-api-token -
+Secret=wikijs-gateway-api-token,type=env,target=WIKIJS_API_TOKEN
+# openssl rand -hex 32 | tr -d '\n' | podman secret create wikijs-gateway-admin-token -
+Secret=wikijs-gateway-admin-token,type=env,target=GATEWAY_ADMIN_TOKEN
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+
+# 이미지에 curl, wget이 없어 python을 쓴다
+# /health는 Wiki.js에 닿지 않아도 200을 돌려준다
+HealthCmd=python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=10s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+# 첫 실행 시 이미지 pull이 기본 제한(90초)을 넘을 수 있다
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
