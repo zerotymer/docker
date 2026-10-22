@@ -1,16 +1,24 @@
-# FileName=postgresql
+# FileName=postgres
+[Network]
+NetworkName=postgres-network
+Driver=bridge
+
+---
+# FileName=postgres
 [Unit]
 Description=PostgreSQL
 After=network-online.target
 Wants=network-online.target
 
 [Container]
-ContainerName=postgresql
-ServiceName=postgresql
-Image=docker.io/library/postgres:18
+ContainerName=postgres
+ServiceName=postgres
+Image=docker.io/library/postgres:latest
 PublishPort=127.0.0.1:5432:5432
 UserNS=keep-id:uid=999,gid=999
-Volume=%h/.local/share/postgresql:/var/lib/postgresql:Z
+Network=postgres.network
+NetworkAlais=postgres
+Volume=%h/.local/share/postgres:/var/lib/postgresql:Z
 # root가 /etc/tmpfiles.d/postgresql.conf로 미리 만든다 (README 참고)
 Volume=/run/postgresql:/var/run/postgresql:Z
 # tmpfiles.d를 쓸 수 없으면 위 줄 대신 아래 줄과 [Service]의 RuntimeDirectory 두 줄을 쓴다
@@ -20,8 +28,8 @@ Environment=POSTGRES_DB=postgres
 Environment=POSTGRES_USER=postgres
 Environment=TZ=Asia/Seoul
 Environment=PGTZ=Asia/Seoul
-# openssl rand -hex 32 | tr -d '\n' | podman secret create postgresql-password -
-Secret=postgresql-password,type=env,target=POSTGRES_PASSWORD
+# openssl rand -hex 32 | tr -d '\n' | podman secret create postgres-password -
+Secret=postgres-password,type=env,target=POSTGRES_PASSWORD
 NoNewPrivileges=true
 DropCapability=NET_RAW NET_ADMIN
 
@@ -34,8 +42,8 @@ HealthStartPeriod=10s
 HealthOnFailure=kill
 
 [Service]
-ExecStartPre=/usr/bin/mkdir -p %h/.local/share/postgresql
-# RuntimeDirectory=postgresql
+ExecStartPre=/usr/bin/mkdir -p %h/.local/share/postgres
+# RuntimeDirectory=postgres
 # RuntimeDirectoryMode=0700
 Restart=on-failure
 RestartSec=5
