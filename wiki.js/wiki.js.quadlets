@@ -1,0 +1,55 @@
+# FileName=wikijs-data
+[Volume]
+VolumeName=wikijs-data
+Label=app=wikijs
+
+---
+
+# FileName=wikijs
+[Unit]
+Description=Wiki.js
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=wikijs
+ServiceName=wikijs
+Image=ghcr.io/requarks/wiki:latest
+PublishPort=127.0.0.1:3000:3000
+Network=postgres.network
+# 이미지가 VOLUME으로 선언한 경로다. /wiki/data에 마운트하면 이 경로는 익명 볼륨으로 따로 잡힌다
+# 이미지는 node(1000)로 실행하고 이 경로는 node:node다
+# 이름 있는 볼륨은 처음 쓸 때 이 소유자를 복사하므로 U를 붙이지 않는다
+Volume=wikijs-data.volume:/wiki/data/content:Z
+# 데이터베이스 접속 정보. 데이터베이스와 역할은 미리 만든다 (README 참고)
+Environment=DB_TYPE=postgres
+Environment=DB_HOST=postgres
+Environment=DB_PORT=5432
+Environment=DB_USER=wikijs
+Environment=DB_NAME=wiki
+Environment=TZ=Asia/Seoul
+# printf '%s' '<비밀번호>' | podman secret create wikijs-db-password -
+Secret=wikijs-db-password,type=env,target=DB_PASS
+# Git 저장소 모듈을 SSH, Path 모드로 쓸 때만 활성화한다 (README 참고)
+# 관리 화면의 SSH Private Key Path에 /run/secrets/git-ssh를 적는다
+# podman secret create wikijs-git-ssh ~/.ssh/<키 파일>
+# Secret=wikijs-git-ssh,type=mount,target=/run/secrets/git-ssh,uid=1000,gid=1000,mode=0400
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+
+# 이미지 Dockerfile에 주석으로 있는 HEALTHCHECK와 같은 경로다
+HealthCmd=curl -fsS -o /dev/null http://localhost:3000/healthz
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+# 첫 실행은 스키마 생성이 끝나야 응답한다
+HealthStartPeriod=60s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

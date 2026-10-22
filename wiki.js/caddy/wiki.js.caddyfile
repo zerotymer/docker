@@ -1,0 +1,15 @@
+# Wiki.js 리버스 프록시
+# GraphQL 구독(/graphql-subscriptions)은 WebSocket을 쓴다. Caddy는 Upgrade를 자동으로 넘긴다.
+# 업로드 본문 제한은 nginx와 같이 64MB로 둔다.
+# 기본 설정이다. 배포 환경에 맞게 사이트 주소, 업스트림 주소를 수정한다.
+# 인증서는 Caddy가 자동으로 발급한다. 직접 지정하려면 tls <인증서> <키>를 추가한다.
+
+wiki.example.com {
+	# 파일 업로드. Wiki.js 관리 화면에서 제한을 늘리면 이 값과 nginx 설정을 함께 늘린다
+	request_body {
+		max_size 64MB
+	}
+
+	# Caddy가 컨테이너이면 같은 네트워크의 컨테이너 이름(wikijs:3000)으로 바꾼다
+	reverse_proxy 127.0.0.1:3001
+}

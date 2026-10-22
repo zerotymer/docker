@@ -1,7 +1,0 @@
-services:
-  wiki:
-    image: ghcr.io/requarks/wiki:3
-    restart: unless-stopped
-    volumes:
-      - ./config.yml:/wiki/config.yml
-    ports:

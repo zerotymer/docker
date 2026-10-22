@@ -1,0 +1,80 @@
+# Wiki.js 2.x. PostgreSQL은 기본으로 포함하지 않는다. default.env, .env의 DB_*로 접속 정보를 넘긴다.
+# 같이 띄울 PostgreSQL이 필요하면 postgres 프로필을 쓴다. .env에 DB_HOST=postgres를 함께 적는다
+#   docker compose --profile postgres up -d
+services:
+  wiki:
+    image: ghcr.io/requarks/wiki:latest
+    container_name: wikijs
+    restart: unless-stopped
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    # postgres 프로필을 켜지 않으면 무시된다
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    # Podman은 host.containers.internal을 자동으로 넣는다. Docker에서도 같은 이름을 쓰게 한다
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
+    ports:
+      # gitea, adguard가 127.0.0.1:3000을 쓴다
+      - "127.0.0.1:3001:3000"
+    volumes:
+      # 이미지가 VOLUME으로 선언한 경로다. /wiki/data에 마운트하면 이 경로는 익명 볼륨으로 따로 잡힌다
+      # 이미지는 node(1000)로 실행하고 이 경로는 node:node다
+      # 이름 있는 볼륨은 처음 쓸 때 이 소유자를 복사한다
+      - wikijs-data:/wiki/data/content
+      # Git 저장소 모듈을 SSH, Path 모드로 쓸 때만 활성화한다 (README 참고)
+      # 관리 화면의 SSH Private Key Path에 /run/secrets/git-ssh를 적는다
+      # 키 파일은 컨테이너 사용자 node(1000)가 읽을 수 있어야 한다
+      # - ./keys/git-ssh:/run/secrets/git-ssh:ro,Z
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      # 이미지 Dockerfile에 주석으로 있는 HEALTHCHECK와 같은 경로다
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # 첫 실행은 스키마 생성이 끝나야 응답한다
+      start_period: 60s
+
+  postgres:
+    image: docker.io/library/postgres:latest
+    container_name: wikijs-postgres
+    profiles: ["postgres"]
+    restart: unless-stopped
+    # default.env, .env는 넘기지 않는다. 같은 값을 .env에서 읽어 채운다
+    # .env에 없으면 default.env의 기본값과 같은 값을 쓴다
+    environment:
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
+      POSTGRES_DB: "${DB_NAME:-wiki}"
+      POSTGRES_USER: "${DB_USER:-wikijs}"
+      POSTGRES_PASSWORD: "${DB_PASS:-wikijs}"
+    volumes:
+      # 18부터 이미지가 /var/lib/postgresql/18/docker에 데이터를 만든다
+      - wikijs-postgres-data:/var/lib/postgresql
+    shm_size: 256mb
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  wikijs-data:
+  wikijs-postgres-data:
