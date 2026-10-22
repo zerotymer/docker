@@ -2,7 +2,7 @@
 
 [Redmine](https://www.redmine.org/) 프로젝트 관리 도구를 로컬에서 실행하기 위한 구성입니다. Docker Compose, Podman Quadlet, `podman kube play` 중 하나를 선택해 사용합니다.
 
-권장 실행은 컨테이너 하나입니다. DB를 지정하지 않으면 공식 이미지가 SQLite(`sqlite/redmine.db`)로 동작합니다. Quadlet과 `pod.yaml`은 이 SQLite 구성만 정의합니다. Compose는 같은 포트를 쓰는 데이터베이스를 프로필로 나누며, 프로필 없이 `up`하면 아무것도 뜨지 않습니다.
+권장 실행은 컨테이너 하나입니다. DB를 지정하지 않으면 공식 이미지가 SQLite(`sqlite/redmine.db`)로 동작합니다. Quadlet은 SQLite를 기본으로 쓰고, 주석을 풀면 외부 MySQL 서버에 접속합니다. `pod.yaml`은 SQLite 구성만 정의합니다. Compose는 같은 포트를 쓰는 데이터베이스를 프로필로 나누며, 프로필 없이 `up`하면 아무것도 뜨지 않습니다.
 
 웹 UI는 `127.0.0.1:3080`에서만 열리며, `http://127.0.0.1:3080/`로 접속합니다. 컨테이너 안 포트는 `3000`이지만 같은 호스트의 `gitea`, `adguard`가 호스트 `3000`을 쓰므로 `3080`으로 공개합니다. 다른 호스트에서 접속하려면 [리버스 프록시](#리버스-프록시)를 앞에 둡니다.
 
@@ -15,7 +15,7 @@ SQLite는 사용자가 여럿인 운영에는 맞지 않습니다. 그 경우에
 | `compose.yaml` | Docker Compose / podman-compose (프로필 `sqlite`, `postgres`, `mysql`) |
 | `default.env` | Compose 기본 환경 변수 (`.env`로 덮어쓰기 가능) |
 | `example.env` | `.env`에 적을 키와 예시 |
-| `redmine.quadlets` | Podman Quadlet (컨테이너 하나, SQLite) |
+| `redmine.quadlets` | Podman Quadlet (컨테이너 하나, SQLite 또는 외부 MySQL) |
 | `pod.yaml` | `podman kube play`용 Pod, PVC, ConfigMap, Secret (SQLite) |
 | `nginx/redmine.conf` | Nginx `server` 블록 |
 | `caddy/redmine.caddyfile` | Caddy 사이트 블록 |
@@ -83,6 +83,34 @@ openssl rand -hex 64 | tr -d '\n' | podman secret create redmine-secret-key-base
 podman quadlet install redmine.quadlets
 systemctl --user daemon-reload
 systemctl --user start redmine
+```
+
+#### MySQL 서버에 연결
+
+Quadlet은 컨테이너 하나만 띄우고, MySQL 서버에는 밖으로 접속합니다. `redmine.quadlets`의 MySQL 줄 주석을 풀면 `REDMINE_DB_MYSQL`이 정해져 SQLite 대신 MySQL을 씁니다. 접속 방법은 서버 위치에 따라 고릅니다.
+
+| 서버 위치 | 설정 |
+|---|---|
+| 같은 호스트의 `mysql/` Quadlet | `Network=mysql.network`, `REDMINE_DB_MYSQL=mysql` |
+| 같은 호스트에서 `127.0.0.1`에만 열린 서버 | `Network=pasta:-T,3306`, `REDMINE_DB_MYSQL=127.0.0.1` (rootless 전용) |
+| 다른 호스트의 서버 | `Network=` 없이 `REDMINE_DB_MYSQL=<주소>` |
+
+`mysql.network`는 `mysql/mysql.quadlets`가 설치합니다. 이 네트워크를 쓰면 MySQL Quadlet을 먼저 설치하세요. 데이터베이스와 사용자는 서버에서 미리 만듭니다.
+
+```sh
+podman exec -it mysql mysql -uroot -p
+```
+
+```sql
+CREATE DATABASE redmine CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'redmine'@'%' IDENTIFIED BY '<비밀번호>';
+GRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'%';
+```
+
+같은 비밀번호를 secret으로 만들고 Quadlet을 다시 적용합니다. 첫 기동에서 `db:migrate`가 스키마를 만듭니다. SQLite에서 쓰던 데이터는 옮겨지지 않습니다.
+
+```sh
+printf '%s' '<비밀번호>' | podman secret create redmine-db-password -
 ```
 
 `podman quadlet install`은 이미 설치된 파일을 덮어쓰지 않습니다. `.quadlets`를 고친 뒤에는 `podman quadlet install --replace redmine.quadlets`, `systemctl --user daemon-reload`, `systemctl --user restart redmine` 순서로 다시 적용합니다. 적용 여부는 `systemctl --user cat redmine`으로 확인합니다.
