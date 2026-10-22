@@ -1,0 +1,16 @@
+# Redmine 리버스 프록시
+# nginx/redmine.conf와 같이 요청 본문을 100MB로 제한한다.
+# Redmine 관리 > 설정 > 파일의 최대 첨부 크기(기본 5MB)보다 크게 둔다.
+# Caddy는 업스트림 타임아웃 기본값이 없어 Nginx처럼 따로 늘리지 않는다.
+# 기본 설정이다. 배포 환경에 맞게 사이트 주소, 업스트림 주소를 수정한다.
+# 인증서는 Caddy가 자동으로 발급한다. 직접 지정하려면 tls <cert> <key>를 추가한다.
+
+redmine.example.com {
+	request_body {
+		max_size 100MB
+	}
+
+	# Caddy가 컨테이너이면 같은 네트워크의 서비스 이름으로 바꾼다
+	# sqlite는 redmine:3000, postgres는 redmine-postgres:3000, mysql은 redmine-mysql:3000
+	reverse_proxy 127.0.0.1:3080
+}

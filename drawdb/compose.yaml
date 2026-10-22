@@ -1,0 +1,25 @@
+# 공식 이미지는 정적 파일만 제공하는 nginx 컨테이너 하나다.
+# 다이어그램은 브라우저에 저장되므로 데이터 볼륨이 없다.
+services:
+  drawdb:
+    image: ghcr.io/drawdb-io/drawdb:latest
+    container_name: drawdb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5173:80"
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      # nginx:alpine에는 curl이 없고 BusyBox wget이 있다
+      test: ["CMD", "wget", "-q", "-T", "3", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

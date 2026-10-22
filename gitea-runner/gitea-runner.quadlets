@@ -1,0 +1,45 @@
+# FileName=gitea-runner
+[Unit]
+Description=Gitea Runner Pod
+After=network-online.target
+Wants=network-online.target
+
+[Pod]
+PodName=gitea-runner
+ServiceName=gitea-runner
+
+[Install]
+WantedBy=default.target
+---
+
+# FileName=gitea-runner-vol
+[Volume]
+VolumeName=gitea-runner-vol
+Label=app=gitea-runner
+
+---
+# FileName=gitea-runner-app
+[Unit]
+Description=Gitea Runner App
+Requires=podman.socket
+After=podman.socket
+
+[Container]
+Pod=gitea-runner.pod
+ContainerName=gitea-runner-app
+Image=docker.io/gitea/act_runner:0.6.1
+Volume=gitea-runner-vol.volume:/data
+# %t: rootless는 /run/user/<UID>, rootful은 /run. job 컨테이너에도 같은 경로로 전달된다
+Volume=%t/podman/podman.sock:%t/podman/podman.sock
+Environment=DOCKER_HOST=unix://%t/podman/podman.sock
+Environment=GITEA_INSTANCE_URL=https://gitea.example.com
+Environment=GITEA_RUNNER_NAME=runner-01
+Environment=GITEA_RUNNER_LABELS=ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest
+# printf '%s' '<등록 토큰>' | podman secret create gitea-runner-token -
+Secret=gitea-runner-token,type=env,target=GITEA_RUNNER_REGISTRATION_TOKEN
+SecurityLabelDisable=true
+NoNewPrivileges=true
+
+[Service]
+Restart=on-failure
+RestartSec=5

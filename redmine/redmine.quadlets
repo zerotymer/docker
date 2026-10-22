@@ -1,0 +1,55 @@
+# FileName=redmine
+[Unit]
+Description=Redmine
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=redmine
+ServiceName=redmine
+Image=docker.io/library/redmine:7.0.2
+PublishPort=127.0.0.1:3080:3000
+# 컨테이너 redmine(999)을 호스트 사용자에 매핑한다. rootless 전용
+# keep-id만 두면 프로세스가 999로 시작해 엔트리포인트의 chown이 빠진다
+# User=0으로 root 시작을 유지하고, chown 대상 999가 호스트 사용자가 되게 한다
+UserNS=keep-id:uid=999,gid=999
+User=0
+# 엔트리포인트가 root로 시작해 files, sqlite를 redmine(999)으로 chown한다. U는 붙이지 않는다
+Volume=%h/.local/share/redmine/files:/usr/src/redmine/files:Z
+Volume=%h/.local/share/redmine/sqlite:/usr/src/redmine/sqlite:Z
+Environment=TZ=Asia/Seoul
+# MySQL 서버를 쓰려면 아래 줄의 주석을 푼다. 그대로 두면 SQLite를 쓴다
+# 데이터베이스와 사용자는 미리 만든다 (README 참고)
+# mysql/mysql.quadlets의 mysql-network에 붙어 별칭 mysql로 접속한다
+# Network=mysql.network
+# Environment=REDMINE_DB_MYSQL=mysql
+# 다른 호스트의 서버라면 Network= 줄은 두지 않고 REDMINE_DB_MYSQL에 그 주소를 적는다
+# 같은 호스트의 127.0.0.1에만 열린 서버라면 아래 줄을 쓰고 REDMINE_DB_MYSQL=127.0.0.1로 둔다. rootless 전용
+# Network=pasta:-T,3306
+# Environment=REDMINE_DB_PORT=3306
+# Environment=REDMINE_DB_DATABASE=redmine
+# Environment=REDMINE_DB_USERNAME=redmine
+# printf '%s' '<비밀번호>' | podman secret create redmine-db-password -
+# Secret=redmine-db-password,type=env,target=REDMINE_DB_PASSWORD
+# openssl rand -hex 64 | tr -d '\n' | podman secret create redmine-secret-key-base -
+Secret=redmine-secret-key-base,type=env,target=SECRET_KEY_BASE
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+
+HealthCmd=wget -q -O /dev/null http://localhost:3000/login
+HealthInterval=30s
+HealthTimeout=10s
+HealthRetries=3
+# 첫 실행은 db:migrate가 끝나야 응답한다
+HealthStartPeriod=120s
+HealthOnFailure=kill
+
+[Service]
+ExecStartPre=/usr/bin/mkdir -p %h/.local/share/redmine/files %h/.local/share/redmine/sqlite
+Restart=on-failure
+RestartSec=5
+# 첫 실행 시 이미지 pull과 db:migrate가 기본 제한(90초)을 넘을 수 있다
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

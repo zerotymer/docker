@@ -1,0 +1,37 @@
+services:
+  nexus:
+    image: docker.io/sonatype/nexus3:latest
+    container_name: nexus
+    restart: unless-stopped
+    # 내장 DB(H2)가 정상 종료되도록 공식 이미지 안내의 docker stop --time=120과 맞춘다
+    stop_grace_period: 120s
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      # 이름 있는 볼륨은 처음 쓸 때 이미지의 /nexus-data 소유자(nexus, uid 200)를 따른다
+      - nexus-vol:/nexus-data
+      # 외부 디스크를 blob store로 쓸 때만 활성화. Docker는 U를 지원하지 않으므로
+      # 호스트에서 먼저 chown -R 200:200 /mnt/nexus 한다
+      # - /mnt/nexus:/mnt/nexus:Z
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/service/rest/v1/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 180s
+
+volumes:
+  nexus-vol:

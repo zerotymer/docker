@@ -1,0 +1,34 @@
+# 권장: 컨테이너 하나, svnserve
+# Docker Hub latest는 1.8.1(2024-11)에 고정되어 있다. main 이미지는 edge다.
+services:
+  svn-server:
+    image: docker.io/garethflowers/svn-server:edge
+    container_name: svn-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3690:3690"
+    volumes:
+      # 이미지는 USER가 없어 root로 실행된다. 이름 있는 볼륨은 엔진이 소유자와 SELinux 레이블을 관리한다
+      # U는 붙이지 않는다. 기동마다 저장소 전체를 root로 chown한다
+      # 바인드 마운트로 바꾸면 :Z를 붙인다. Docker는 U를 지원하지 않는다
+      # - ./data:/var/opt/svn:Z
+      - svn-server-vol:/var/opt/svn
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      # 이미지 HEALTHCHECK와 같다. busybox netstat이 /proc/net/tcp를 읽는다
+      test: ["CMD-SHELL", "netstat -ln | grep -q 3690"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  svn-server-vol:

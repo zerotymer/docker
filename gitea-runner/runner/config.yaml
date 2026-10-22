@@ -1,0 +1,48 @@
+# =============================================================================
+# Gitea Runner 설정 (latest 5.x / stable 4.x 공용)
+# 전체 항목: docker run --rm gitea/runner:<버전> gitea-runner generate-config
+#
+# 공용으로 쓰기 위해 두 버전에 모두 있는 키만 사용함
+#   [5.x] ${NAME} 은 환경변수로 치환되며 미설정 시 로딩 실패 → 이 파일에서는 사용하지 않음
+#         리터럴 "${" 가 필요하면 $${ 로 작성
+# =============================================================================
+
+log:
+  level: info
+
+runner:
+  # 등록 정보 파일 (/data 는 버전별 디렉터리로 분리 마운트됨)
+  file: /data/.runner
+  # 동시 실행 job 수 (개발서버 CPU/메모리에 맞게 조정)
+  capacity: 2
+  # job 최대 실행 시간
+  timeout: 3h
+  # 라벨 = workflow 의 runs-on 값 ↔ 실행 이미지 매핑
+  #   [5.x] runs-on 이 없는 job 은 실패하므로 워크플로에 반드시 명시
+  labels:
+    - "ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest"
+    - "ubuntu-24.04:docker://docker.gitea.com/runner-images:ubuntu-24.04"
+    - "ubuntu-22.04:docker://docker.gitea.com/runner-images:ubuntu-22.04"
+    # 가벼운 job 용 (Node.js 포함, 용량 작음)
+    - "ubuntu-slim:docker://docker.gitea.com/runner-images:ubuntu-latest-slim"
+
+cache:
+  # actions/cache 용 내장 캐시 서버
+  enabled: true
+  dir: /data/cache
+  # 비워두면 자동 감지 (job 컨테이너가 접속할 runner 주소)
+  host: ""
+  port: 0
+
+container:
+  # 비워두면 job 마다 네트워크 생성 (job 간 격리)
+  network: ""
+  # true 는 job 안에서 docker 빌드(DinD)가 필요할 때만 - 보안상 기본 false
+  privileged: false
+  options: ""
+  # job 에서 마운트 가능한 경로 (빈 배열 = 전부 금지). [4.x+] 경로 전체 매칭은 "**"
+  valid_volumes: []
+  # 비워두면 마운트된 /var/run/docker.sock 자동 사용
+  docker_host: ""
+  # 로컬에 있는 이미지 재사용 (개발서버 대역폭 절약). 최신 이미지 강제 시 true
+  force_pull: false

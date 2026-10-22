@@ -1,0 +1,51 @@
+# FileName=nexus
+[Unit]
+Description=Nexus Repository
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=nexus
+ServiceName=nexus
+Image=docker.io/sonatype/nexus3:latest
+PublishPort=127.0.0.1:8081:8081
+# 이름 있는 볼륨은 Podman이 처음 쓸 때 이미지의 /nexus-data 소유자(nexus, uid 200)로 맞춘다.
+# U는 기동마다 재귀 chown을 해서 blob이 많으면 느려지므로 붙이지 않는다
+Volume=nexus-vol.volume:/nexus-data:Z
+# 외부 디스크를 blob store로 쓸 때만 활성화
+# Volume=/mnt/nexus:/mnt/nexus:Z
+# User=1200
+# Group=1200
+# 이미지 기본값(-Djava.util.prefs.userRoot=...)을 덮어쓰므로 함께 적는다
+Environment="INSTALL4J_ADD_VM_PARAMS=-Xms1g -Xmx2g -XX:MaxDirectMemorySize=1g -Djava.util.prefs.userRoot=/nexus-data/javaprefs"
+Environment=TZ=Asia/Seoul
+Memory=4g
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+Ulimit=nofile=65536:65536
+# 내장 DB(H2)가 정상 종료되도록 공식 안내의 docker stop --time=120과 맞춘다
+StopTimeout=120
+
+HealthCmd=curl -fsS http://localhost:8081/service/rest/v1/status
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=5
+HealthStartPeriod=180s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+# StopTimeout(120초)보다 길어야 systemd가 먼저 프로세스를 죽이지 않는다
+TimeoutStopSec=150
+
+[Install]
+WantedBy=default.target
+
+---
+
+# FileName=nexus-vol
+[Volume]
+VolumeName=nexus-vol
+Label=app=nexus

@@ -1,6 +1,0 @@
-[Pod]
-PodName=linkding-pod
-PublishPort=9090
-
-[Install]
-WantedBy=multi-user.target

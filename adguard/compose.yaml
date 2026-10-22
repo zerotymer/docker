@@ -1,0 +1,31 @@
+services:
+  adguard:
+    container_name: adguard
+    image: docker.io/adguard/adguardhome:latest
+    restart: unless-stopped
+    ports:
+      # DNS
+      - "53:53/tcp"
+      - "53:53/udp"
+      # 웹 UI, DNS-over-HTTPS
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+      # 최초 설정 마법사
+      - "127.0.0.1:3000:3000/tcp"
+      # DNS-over-TLS, DNS-over-QUIC
+      - "853:853/tcp"
+      - "853:853/udp"
+      # DNSCrypt
+      - "5443:5443/tcp"
+      - "5443:5443/udp"
+    volumes:
+      # Docker는 U 옵션을 지원하지 않는다. 컨테이너가 root로 실행되므로 소유권은 맞출 필요가 없다
+      - ./data/work:/opt/adguardhome/work:Z
+      - ./data/conf:/opt/adguardhome/conf:Z
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    security_opt:
+      - no-new-privileges:true

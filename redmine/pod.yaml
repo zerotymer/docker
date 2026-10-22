@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: redmine
+  namespace: redmine
+  labels:
+    app: redmine
+  annotations:
+    # 컨테이너 redmine(999)을 호스트 사용자에 매핑한다. rootless 전용
+    # runAsUser 0이 없으면 keep-id가 프로세스를 999로 시작해 chown이 빠진다
+    io.podman.annotations.userns: keep-id:uid=999,gid=999
+spec:
+  restartPolicy: Always
+  securityContext:
+    runAsUser: 0
+    fsGroup: 999
+  containers:
+    - name: redmine
+      image: docker.io/library/redmine:7.0.2
+      ports:
+        - containerPort: 3000
+          hostPort: 3080
+          hostIP: 127.0.0.1
+      envFrom:
+        - configMapRef:
+            name: redmine-default
+        - secretRef:
+            name: redmine-secret
+      volumeMounts:
+        - name: redmine-files
+          mountPath: /usr/src/redmine/files
+        - name: redmine-sqlite
+          mountPath: /usr/src/redmine/sqlite
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - NET_RAW
+            - NET_ADMIN
+      # 첫 실행은 db:migrate가 끝나야 응답한다
+      startupProbe:
+        exec:
+          command: ["wget", "-q", "-O", "/dev/null", "http://localhost:3000/login"]
+        periodSeconds: 10
+        failureThreshold: 30
+      livenessProbe:
+        exec:
+          command: ["wget", "-q", "-O", "/dev/null", "http://localhost:3000/login"]
+        periodSeconds: 30
+        timeoutSeconds: 10
+        failureThreshold: 3
+
+  volumes:
+    - name: redmine-files
+      persistentVolumeClaim:
+        claimName: redmine-files
+    - name: redmine-sqlite
+      persistentVolumeClaim:
+        claimName: redmine-sqlite
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redmine-files
+  namespace: redmine
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redmine-sqlite
+  namespace: redmine
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redmine-default
+  namespace: redmine
+data:
+  TZ: "Asia/Seoul"
+
+---
+# 예제 값. 실제 키로 바꾼 파일은 커밋하지 않는다
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redmine-secret
+  namespace: redmine
+type: Opaque
+stringData:
+  # 실행 전 openssl rand -hex 64 값으로 교체
+  # 비워 두면 엔트리포인트가 컨테이너 안에 만들고, 컨테이너를 다시 만들 때마다 로그인이 풀린다
+  SECRET_KEY_BASE: "redmine"

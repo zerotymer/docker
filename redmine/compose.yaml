@@ -1,0 +1,131 @@
+# 데이터베이스마다 프로필이 있다. 모두 127.0.0.1:3080을 쓰므로 하나만 골라 띄운다.
+# 권장: 컨테이너 하나, SQLite
+#   docker compose --profile sqlite up -d
+x-redmine: &redmine
+  image: docker.io/library/redmine:7.0.2
+  restart: unless-stopped
+  ports:
+    - "127.0.0.1:3080:3000"
+  env_file:
+    - default.env
+    - path: .env
+      required: false
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - NET_RAW
+    - NET_ADMIN
+  healthcheck:
+    test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/login"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    # 첫 실행은 db:migrate가 끝나야 응답한다
+    start_period: 120s
+
+services:
+  redmine:
+    <<: *redmine
+    container_name: redmine
+    profiles: ["sqlite"]
+    volumes:
+      # 엔트리포인트가 root로 시작해 files, sqlite를 redmine(999:999)으로 chown한다
+      # 이름 있는 볼륨은 엔진이 SELinux 레이블을 관리한다. 바인드 마운트로 바꾸면 :Z를 붙인다
+      # U는 붙이지 않는다. 이미지 기본 사용자가 root라 기동 전에 소유자가 root로 바뀐다
+      - redmine-files:/usr/src/redmine/files
+      - redmine-sqlite:/usr/src/redmine/sqlite
+
+  redmine-postgres:
+    <<: *redmine
+    container_name: redmine-postgres
+    profiles: ["postgres"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      REDMINE_DB_POSTGRES: postgres
+      REDMINE_DB_PORT: "5432"
+      REDMINE_DB_DATABASE: redmine
+      REDMINE_DB_USERNAME: redmine
+      REDMINE_DB_PASSWORD: ${REDMINE_DB_PASSWORD:-redmine}
+    volumes:
+      - redmine-postgres-files:/usr/src/redmine/files
+
+  postgres:
+    image: docker.io/library/postgres:18
+    container_name: redmine-postgres-db
+    profiles: ["postgres"]
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+      POSTGRES_DB: redmine
+      POSTGRES_USER: redmine
+      POSTGRES_PASSWORD: ${REDMINE_DB_PASSWORD:-redmine}
+    volumes:
+      # PostgreSQL 18 이미지는 /var/lib/postgresql/18/docker에 데이터를 둔다
+      # 이름 있는 볼륨은 엔진이 SELinux 레이블을 관리한다. 바인드 마운트로 바꾸면 :Z를 붙인다
+      - redmine-postgres-data:/var/lib/postgresql
+    shm_size: 256mb
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "redmine", "-d", "redmine"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  redmine-mysql:
+    <<: *redmine
+    container_name: redmine-mysql
+    profiles: ["mysql"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      REDMINE_DB_MYSQL: mysql
+      REDMINE_DB_PORT: "3306"
+      REDMINE_DB_DATABASE: redmine
+      REDMINE_DB_USERNAME: redmine
+      REDMINE_DB_PASSWORD: ${REDMINE_DB_PASSWORD:-redmine}
+    volumes:
+      - redmine-mysql-files:/usr/src/redmine/files
+
+  mysql:
+    image: docker.io/library/mysql:9.7
+    container_name: redmine-mysql-db
+    profiles: ["mysql"]
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+      MYSQL_DATABASE: redmine
+      MYSQL_USER: redmine
+      MYSQL_PASSWORD: ${REDMINE_DB_PASSWORD:-redmine}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-redmine}
+    volumes:
+      # 엔트리포인트가 root로 시작해 /var/lib/mysql을 mysql(999)로 chown한다
+      # 이름 있는 볼륨은 엔진이 SELinux 레이블을 관리한다. 바인드 마운트로 바꾸면 :Z를 붙인다
+      - redmine-mysql-data:/var/lib/mysql
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      # TCP로 확인한다. 초기화 중 임시 서버는 소켓만 열어 두므로 소켓 ping은 너무 일찍 성공한다
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+volumes:
+  redmine-files:
+  redmine-sqlite:
+  redmine-postgres-files:
+  redmine-postgres-data:
+  redmine-mysql-files:
+  redmine-mysql-data:

@@ -6,7 +6,7 @@ Docker Compose 또는 `docker run`으로 실행할 수 있는 서비스별 배�
 
 - 모니터링: Grafana, Prometheus
 - 웹 및 프록시: Nginx, Heimdall, Linkding
-- 개발 도구: Gitea, Jenkins, Nexus, Dependency-Track
+- 개발 도구: Gitea, Jenkins, Nexus, Dependency-Track, SVN
 - 기타: Wiki.js, Step CA, Termix, BusyBox, LLM Registry
 
 서비스별 Compose 파일, 설정 파일, 실행 스크립트는 해당 디렉터리에 있습니다. 예를 들어 Nginx 구성은 `nginx/`, Gitea 구성은 `gitea/`에서 관리합니다.

@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: drawdb
+  namespace: drawdb
+  labels:
+    app: drawdb
+spec:
+  restartPolicy: Always
+  containers:
+    - name: drawdb
+      image: ghcr.io/drawdb-io/drawdb:latest
+      ports:
+        - containerPort: 80
+          hostPort: 5173
+          hostIP: 127.0.0.1
+      envFrom:
+        - configMapRef:
+            name: drawdb-default
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - NET_RAW
+            - NET_ADMIN
+      startupProbe:
+        httpGet:
+          path: /
+          port: 80
+        periodSeconds: 5
+        failureThreshold: 6
+      livenessProbe:
+        httpGet:
+          path: /
+          port: 80
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: drawdb-default
+  namespace: drawdb
+data:
+  TZ: "Asia/Seoul"
+  # 브라우저가 공유와 메일 전송에 여는 주소. 비우면 앱 기본값 http://localhost:5000
+  VITE_BACKEND_URL: ""
+  # gist만 다른 주소일 때. 비우면 VITE_BACKEND_URL
+  VITE_GIST_BACKEND_URL: ""

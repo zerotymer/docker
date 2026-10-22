@@ -2,38 +2,56 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: linkding
-  labels: linkding
-
+  namespace: linkding
+  labels:
+    app: linkding
 spec:
   restartPolicy: Always
-
   containers:
     - name: linkding
-      image: docker.io/sissbruecker/linkding:latest-alpine        
+      image: docker.io/sissbruecker/linkding:latest-alpine
       ports:
         - containerPort: 9090
-        - hostPort: 9090
+          hostPort: 9090
+          hostIP: 127.0.0.1
       envFrom:
-        - configMap:
+        - configMapRef:
             name: linkding-default
         - secretRef:
             name: linkding-secret
-            optional: true
       volumeMounts:
+        # 엔트리포인트가 root로 시작해 데이터 디렉터리를 www-data(33)로 chown한다
         - name: linkding-vol
           mountPath: /etc/linkding/data
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - NET_RAW
+            - NET_ADMIN
+      startupProbe:
+        exec:
+          command: ["curl", "-fsS", "http://localhost:9090/health"]
+        periodSeconds: 5
+        failureThreshold: 12
+      livenessProbe:
+        exec:
+          command: ["curl", "-fsS", "http://localhost:9090/health"]
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
 
   volumes:
     - name: linkding-vol
-      persistentVolumeClaim: 
-      claimName: linkding-vol
+      persistentVolumeClaim:
+        claimName: linkding-vol
 
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: linkding-vol
-
+  namespace: linkding
 spec:
   accessModes:
     - ReadWriteOnce
@@ -46,19 +64,17 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: linkding-default
+  namespace: linkding
 data:
   LD_SUPERUSER_NAME: "admin"
-  LD_SUPERUSER_PASSWORD: "password"
-  LD_DISABLE_BACKGROUND_TASK: "true"
 
 ---
-# 최종 비밀값
+# 예제 값. 실제 비밀번호로 바꾼 파일은 커밋하지 않는다
 apiVersion: v1
 kind: Secret
 metadata:
   name: linkding-secret
+  namespace: linkding
 type: Opaque
 data:
-  LD_SUPERUSER_NAME: "admin"
-  LD_SUPERUSER_PASSWORD: "password"
-
+  LD_SUPERUSER_PASSWORD: "cGFzc3dvcmQ=" # password

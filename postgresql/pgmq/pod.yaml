@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pgmq
+  namespace: pgmq
+  labels:
+    app: pgmq
+spec:
+  restartPolicy: Always
+  containers:
+    - name: pgmq
+      image: ghcr.io/pgmq/pg18-pgmq:v1.10.0
+      ports:
+        - containerPort: 5432
+          hostPort: 5432
+          hostIP: 127.0.0.1
+      envFrom:
+        - configMapRef:
+            name: pgmq-default
+        - secretRef:
+            name: pgmq-secret
+      volumeMounts:
+        - name: pgmq-vol
+          mountPath: /var/lib/postgresql
+        - name: pgmq-init
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+        - name: pgmq-shm
+          mountPath: /dev/shm
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - NET_RAW
+            - NET_ADMIN
+      startupProbe:
+        exec:
+          command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+        periodSeconds: 5
+        failureThreshold: 12
+      livenessProbe:
+        exec:
+          command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+        periodSeconds: 10
+        timeoutSeconds: 3
+        failureThreshold: 5
+
+  volumes:
+    - name: pgmq-vol
+      persistentVolumeClaim:
+        claimName: pgmq-vol
+    - name: pgmq-init
+      configMap:
+        name: pgmq-init
+    - name: pgmq-shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 256Mi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgmq-vol
+  namespace: pgmq
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgmq-default
+  namespace: pgmq
+data:
+  POSTGRES_DB: "pgmq_lab"
+  POSTGRES_USER: "postgres"
+  TZ: "Asia/Seoul"
+  PGTZ: "Asia/Seoul"
+
+---
+# init/01-pgmq.sql과 같은 내용을 유지
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgmq-init
+  namespace: pgmq
+data:
+  01-pgmq.sql: |
+    \set ON_ERROR_STOP on
+    CREATE EXTENSION IF NOT EXISTS pgmq;
+    SELECT pgmq.create('test_queue');
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pgmq-secret
+  namespace: pgmq
+type: Opaque
+stringData:
+  # 실행 전 openssl rand -hex 32 값으로 교체
+  POSTGRES_PASSWORD: "postgres"

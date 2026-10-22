@@ -1,0 +1,92 @@
+# PostgreSQL은 포함하지 않는다. ConfigMap wikijs, Secret wikijs-db로 접속 정보를 넘긴다.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: wikijs
+  namespace: wikijs
+  labels:
+    app: wikijs
+spec:
+  restartPolicy: Always
+  containers:
+    - name: wiki
+      image: ghcr.io/requarks/wiki:latest
+      ports:
+        # gitea, adguard가 127.0.0.1:3000을 쓴다
+        - containerPort: 3000
+          hostPort: 3001
+          hostIP: 127.0.0.1
+      envFrom:
+        - configMapRef:
+            name: wikijs
+        - secretRef:
+            name: wikijs-db
+      volumeMounts:
+        - name: wikijs-data
+          # 이미지가 VOLUME으로 선언한 경로
+          mountPath: /wiki/data/content
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - NET_RAW
+            - NET_ADMIN
+      # 첫 실행은 스키마 생성이 끝나야 응답한다
+      startupProbe:
+        httpGet:
+          path: /healthz
+          port: 3000
+        periodSeconds: 5
+        failureThreshold: 24
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 3000
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
+
+  volumes:
+    - name: wikijs-data
+      persistentVolumeClaim:
+        claimName: wikijs-data
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wikijs-data
+  namespace: wikijs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# default.env와 같은 값
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wikijs
+  namespace: wikijs
+data:
+  TZ: "Asia/Seoul"
+  DB_TYPE: "postgres"
+  # host.containers.internal은 Podman이 호스트 주소로 넣어 준다. 127.0.0.1에만 열린 DB에는 닿지 않는다
+  DB_HOST: "host.containers.internal"
+  DB_PORT: "5432"
+  DB_USER: "wikijs"
+  DB_NAME: "wiki"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wikijs-db
+  namespace: wikijs
+type: Opaque
+stringData:
+  # 실행 전 실제 비밀번호로 교체. 비밀번호를 넣은 pod.yaml은 커밋하지 않는다
+  DB_PASS: "wikijs"

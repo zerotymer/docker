@@ -1,1 +1,6 @@
 .env
+
+data/**
+dependency-track/dtrack-data/
+.data/
+wiki.js/keys/

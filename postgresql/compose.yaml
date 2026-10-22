@@ -1,0 +1,58 @@
+# 주 버전마다 프로필이 있다. 모두 127.0.0.1:5432를 쓰므로 하나만 골라 띄운다.
+#   docker compose --profile 18 up -d
+x-postgresql: &postgresql
+  restart: unless-stopped
+  ports:
+    - "127.0.0.1:5432:5432"
+  env_file:
+    - default.env
+    - path: .env
+      required: false
+  environment:
+    TZ: Asia/Seoul
+    PGTZ: Asia/Seoul
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - NET_RAW
+    - NET_ADMIN
+  shm_size: 256mb
+  healthcheck:
+    test:
+      - "CMD-SHELL"
+      - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+    interval: 5s
+    timeout: 3s
+    retries: 10
+    start_period: 10s
+
+services:
+  postgresql-18:
+    <<: *postgresql
+    image: docker.io/library/postgres:18
+    container_name: postgresql-18
+    profiles: ["18"]
+    volumes:
+      # 18부터 이미지가 /var/lib/postgresql/18/docker에 데이터를 만든다
+      - postgresql-18-data:/var/lib/postgresql
+
+  postgresql-17:
+    <<: *postgresql
+    image: docker.io/library/postgres:17
+    container_name: postgresql-17
+    profiles: ["17"]
+    volumes:
+      - postgresql-17-data:/var/lib/postgresql/data
+
+  postgresql-16:
+    <<: *postgresql
+    image: docker.io/library/postgres:16
+    container_name: postgresql-16
+    profiles: ["16"]
+    volumes:
+      - postgresql-16-data:/var/lib/postgresql/data
+
+volumes:
+  postgresql-18-data:
+  postgresql-17-data:
+  postgresql-16-data:

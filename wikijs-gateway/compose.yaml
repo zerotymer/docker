@@ -1,0 +1,46 @@
+# Wiki.js GraphQL API 앞에 두는 게이트웨이. Wiki.js는 포함하지 않는다.
+# wiki.js/ Compose가 만드는 wikijs-network에 붙어 http://wikijs:3000/graphql로 접속한다.
+# wiki.js를 먼저 띄운다.
+services:
+  gateway:
+    image: docker.io/zerotymer/wikijs-gateway:latest
+    container_name: wikijs-gateway
+    restart: unless-stopped
+    env_file:
+      - default.env
+      - path: .env
+        required: false
+    networks:
+      - wikijs-network
+    ports:
+      # 읽기 API와 /mcp 읽기 도구는 인증이 없다. 외부에 열지 않는다
+      - "127.0.0.1:28081:8080"
+    volumes:
+      # 감사 기록. 이미지가 /audit를 nobody:nogroup으로 만든다
+      # 이름 있는 볼륨은 처음 쓸 때 이 소유자를 복사한다
+      - wikijs-gateway-audit:/audit
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    healthcheck:
+      # 이미지에 curl, wget이 없어 python을 쓴다
+      # /health는 Wiki.js에 닿지 않아도 200을 돌려준다. 연결 상태는 본문의 wikijsReachable로 본다
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  # wiki.js/compose.yaml의 기본 네트워크
+  wikijs-network:
+    external: true
+
+volumes:
+  wikijs-gateway-audit:

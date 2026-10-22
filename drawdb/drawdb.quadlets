@@ -1,0 +1,34 @@
+# FileName=drawdb
+[Unit]
+Description=drawDB
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=drawdb
+ServiceName=drawdb
+Image=ghcr.io/drawdb-io/drawdb:latest
+PublishPort=127.0.0.1:5173:80
+Environment=TZ=Asia/Seoul
+# 브라우저가 공유와 메일 전송에 여는 주소. 비우면 앱 기본값 http://localhost:5000
+Environment=VITE_BACKEND_URL=
+# gist만 다른 주소일 때. 비우면 VITE_BACKEND_URL
+Environment=VITE_GIST_BACKEND_URL=
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+AutoUpdate=registry
+
+# nginx:alpine에는 curl이 없고 BusyBox wget이 있다
+HealthCmd=wget -q -T 3 -O /dev/null http://127.0.0.1/
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=10s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

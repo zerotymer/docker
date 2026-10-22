@@ -1,0 +1,24 @@
+# Dependency-Track 리버스 프록시
+# 웹 UI와 API는 호스트가 다르다. 브라우저는 UI에서 API_BASE_URL로 API를 직접 호출한다.
+# BOM, VEX 업로드는 API로 가므로 API 사이트의 본문 제한만 nginx와 같이 256MB로 둔다.
+# 기본 설정이다. 배포 환경에 맞게 사이트 주소, 업스트림 주소를 수정한다.
+# 인증서는 Caddy가 자동으로 발급한다. 직접 지정하려면 tls <인증서> <키>를 추가한다.
+
+dependency-track.example.com {
+	# Caddy가 컨테이너이면 같은 네트워크의 컨테이너 이름(dtrack-frontend:8080)으로 바꾼다
+	reverse_proxy 127.0.0.1:8083
+}
+
+dependency-track-api.example.com {
+	request_body {
+		max_size 256MB
+	}
+
+	# Caddy가 컨테이너이면 같은 네트워크의 컨테이너 이름(dtrack-api:8080)으로 바꾼다
+	reverse_proxy 127.0.0.1:8082 {
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+}

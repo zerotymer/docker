@@ -1,0 +1,35 @@
+# FileName=termix
+[Unit]
+Description=Termix
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=termix
+ServiceName=termix
+Image=ghcr.io/termix-ssh/termix:latest
+PublishPort=127.0.0.1:8080:8080
+UserNS=keep-id:uid=1000,gid=1000
+Volume=%h/.local/share/termix:/app/data:Z,U
+Environment=TZ=Asia/Seoul
+Environment=PORT=8080
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+AutoUpdate=registry
+
+HealthCmd=wget -q -O /dev/null http://localhost:30001/health
+HealthInterval=30s
+HealthTimeout=10s
+HealthRetries=3
+HealthStartPeriod=60s
+HealthOnFailure=kill
+
+[Service]
+# 바인드 마운트 원본이 없으면 컨테이너가 시작되지 않는다
+ExecStartPre=/usr/bin/mkdir -p %h/.local/share/termix
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

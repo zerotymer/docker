@@ -1,0 +1,84 @@
+# Wiki.js는 포함하지 않는다. wiki.js/pod.yaml과 같은 네트워크로 실행한다.
+#   podman network create wikijs-network
+#   podman kube play --network wikijs-network --replace pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: wikijs-gateway
+  namespace: wikijs
+  labels:
+    app: wikijs-gateway
+spec:
+  restartPolicy: Always
+  containers:
+    - name: gateway
+      image: docker.io/zerotymer/wikijs-gateway:latest
+      ports:
+        # 읽기 API와 /mcp 읽기 도구는 인증이 없다. 외부에 열지 않는다
+        - containerPort: 8080
+          hostPort: 28081
+          hostIP: 127.0.0.1
+      envFrom:
+        - configMapRef:
+            name: wikijs-gateway
+        - secretRef:
+            name: wikijs-gateway
+      volumeMounts:
+        - name: wikijs-gateway-audit
+          mountPath: /audit
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - NET_RAW
+            - NET_ADMIN
+      # /health는 Wiki.js에 닿지 않아도 200을 돌려준다
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8080
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
+
+  volumes:
+    - name: wikijs-gateway-audit
+      persistentVolumeClaim:
+        claimName: wikijs-gateway-audit
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wikijs-gateway-audit
+  namespace: wikijs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# default.env와 같은 값
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wikijs-gateway
+  namespace: wikijs
+data:
+  TZ: "Asia/Seoul"
+  # wiki.js/pod.yaml의 컨테이너 이름(<Pod>-<컨테이너>)
+  WIKIJS_GRAPHQL_URL: "http://wikijs-wiki:3000/graphql"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wikijs-gateway
+  namespace: wikijs
+type: Opaque
+stringData:
+  # 실행 전 실제 값으로 교체. 값을 넣은 pod.yaml은 커밋하지 않는다
+  WIKIJS_API_TOKEN: ""
+  GATEWAY_ADMIN_TOKEN: ""
