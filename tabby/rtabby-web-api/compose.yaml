@@ -1,0 +1,12 @@
+services:
+  rtabby-web-api:
+    image: ghcr.io/clem-fern/rtabby-web-api:latest
+    container_name: rtabby-web-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./users.yml:/app/users.yml:ro
+    environment:
+      - DATABASE_URL=sqlite:///app/data/db.sqlite
