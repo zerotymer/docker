@@ -1,0 +1,15 @@
+# FileName=rtabby-web-api
+[Unit]
+Description=rtabby-web-api
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=rtabby-web-api
+ServiceName=rtabby
+Image=ghcr.io/clem-fern/rtabby-web-api:latest
+PublishPort=127.0.0.1:8080:8080
+Volume=/srv/rtabby-web-api/data:/app/data:Z,U
+Volume=/srv/rtabby-web-api/users.yaml:/app/users.yml:ro
+Environment=DATABASEURL=sqlite:///app/data/db.sqlite
+
