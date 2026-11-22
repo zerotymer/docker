@@ -6,19 +6,21 @@ Wants=network-online.target
 
 [Container]
 ContainerName=rtabby-web-api
-ServiceName=rtabby
-Image=ghcr.io/clem-fern/rtabby-web-api:latest
+ServiceName=rtabby-web-api
+Image=ghcr.io/clem-fern/rtabby-web-api:latest-sqlite
 PublishPort=127.0.0.1:8080:8080
-Volume=/srv/rtabby-web-api/data:/app/data:Z,U
-Volume=/srv/rtabby-web-api/users.yaml:/app/users.yml:ro
-Environment=DATABASEURL=sqlite:///app/data/db.sqlite
+Volume=/srv/rtabby-web-api/config:/config:Z,U
+Environment=DATABASE_URL=/config/db.sqlite
+NoNewPrivileges=true
+DropCapability=NET_RAW NET_ADMIN
+AutoUpdate=registry
 
-HealthCmd=curl http://localhost:8080/health
-HealthInterval=30s
-HealthTimeout=10s
-HealthRetries=3
-HealthStartPeriod=60s
-HealthOnFailure=kill
+#HealthCmd=curl http://localhost:8080/health
+#HealthInterval=30s
+#HealthTimeout=10s
+#HealthRetries=3
+#HealthStartPeriod=60s
+#HealthOnFailure=kill
 
 [Service]
 Restart=on-failure
