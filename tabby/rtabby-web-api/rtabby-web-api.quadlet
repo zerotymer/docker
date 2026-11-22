@@ -13,3 +13,17 @@ Volume=/srv/rtabby-web-api/data:/app/data:Z,U
 Volume=/srv/rtabby-web-api/users.yaml:/app/users.yml:ro
 Environment=DATABASEURL=sqlite:///app/data/db.sqlite
 
+HealthCmd=curl http://localhost:8080/health
+HealthInterval=30s
+HealthTimeout=10s
+HealthRetries=3
+HealthStartPeriod=60s
+HealthOnFailure=kill
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
